@@ -16,3 +16,8 @@ class Config:
     
     # Output files settings
     OUTPUT_FILES_DIR = 'outputs'
+    
+    # Task Management Configuration
+    MAX_CONCURRENT_TASKS = 1  # 最大并发任务数
+    TASK_TIMEOUT_MINUTES = 30  # 任务超时时间(分钟)
+    STATUS_CHECK_INTERVAL = 10  # 状态检查间隔（秒）

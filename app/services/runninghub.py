@@ -1,5 +1,6 @@
 import requests
 import json
+import uuid
 from datetime import datetime
 from flask import current_app
 from app.models import TaskLog
@@ -48,7 +49,7 @@ class RunningHubService:
                 self._log(task_id, f"❌ 文件上传异常: {str(e)}")
             raise
     
-    def run_task(self, node_info_list, task_id, workflow_id):
+    def run_task(self, node_info_list, task_id, workflow_id, is_plus=False):
         """发起AI任务"""
         try:
             # 详细记录配置信息
@@ -72,6 +73,11 @@ class RunningHubService:
                 "apiKey": self.api_key,
                 "nodeInfoList": node_info_list
             }
+            
+            # 如果是Plus实例，添加instanceType参数
+            if is_plus:
+                request_data["instanceType"] = "plus"
+                self._log(task_id, "⚡ 使用Plus实例 (48G显存机器)")
             
             self._log(task_id, "🚀 准备调用 create，完整请求参数：")
             self._log(task_id, json.dumps(request_data, ensure_ascii=False, indent=2))
@@ -216,6 +222,85 @@ class RunningHubService:
             self._log(task_id, f"❌ 结果获取异常: {str(e)}")
             return None
     
+    def create_task(self, workflow_id, task_data, is_plus=False):
+        """创建任务（新接口方法）"""
+        # 转换为旧接口格式
+        node_info_list = []
+        for data in task_data:
+            node_info_list.append({
+                'nodeId': data['node_id'],
+                'fieldName': data['field_name'],
+                'fieldValue': data['field_value']
+            })
+        
+        # 生成临时task_id用于日志
+        temp_task_id = str(uuid.uuid4())[:8]
+        
+        try:
+            runninghub_task_id = self.run_task(node_info_list, temp_task_id, workflow_id, is_plus)
+            return {'taskId': runninghub_task_id}
+        except Exception as e:
+            return None
+    
+    def get_task_status(self, runninghub_task_id):
+        """获取任务状态（新接口方法）"""
+        temp_task_id = str(uuid.uuid4())[:8]
+        status = self.get_status(runninghub_task_id, temp_task_id)
+        if status:
+            return {'status': status}
+        return None
+    
+    def get_task_progress(self, runninghub_task_id):
+        """获取任务进度"""
+        # RunningHub目前可能不支持进度查询，返回基于状态的简单进度
+        status_info = self.get_task_status(runninghub_task_id)
+        if status_info:
+            status = status_info.get('status', '')
+            if status == 'queue':
+                return {'progress': 0, 'message': '排队中'}
+            elif status == 'running':
+                return {'progress': 50, 'message': '执行中'}
+            elif status == 'success':
+                return {'progress': 100, 'message': '完成'}
+            elif status == 'failed':
+                return {'progress': 0, 'message': '失败'}
+        return None
+    
+    def get_task_outputs(self, runninghub_task_id):
+        """获取任务输出列表"""
+        temp_task_id = str(uuid.uuid4())[:8]
+        outputs = self.get_outputs(runninghub_task_id, temp_task_id)
+        if outputs:
+            # 转换为文件列表格式
+            file_list = []
+            for output in outputs:
+                if isinstance(output, dict) and 'fileUrl' in output:
+                    file_list.append({
+                        'name': output.get('fileName', 'output.file'),
+                        'url': output['fileUrl']
+                    })
+            return file_list
+        return []
+    
+    def download_output_file(self, runninghub_task_id, output_name):
+        """下载输出文件"""
+        outputs = self.get_task_outputs(runninghub_task_id)
+        for output in outputs:
+            if output['name'] == output_name:
+                try:
+                    response = requests.get(output['url'])
+                    if response.status_code == 200:
+                        return response.content
+                except Exception as e:
+                    current_app.logger.error(f"Failed to download file: {e}")
+        return None
+    
+    def cancel_task(self, runninghub_task_id):
+        """取消任务"""
+        # RunningHub可能不支持任务取消，返回True表示已处理
+        # 实际实现中可以调用相应的API
+        return True
+
     def _log(self, task_id, message):
         """记录任务日志"""
         try:

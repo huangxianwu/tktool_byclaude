@@ -607,3 +607,22 @@ nav a:hover {
         gap: 4px;
     }
 }
+
+/* Plus 标记样式 */
+.plus-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.plus-yes {
+    background-color: #f39c12;
+    color: white;
+}
+
+.plus-no {
+    background-color: #95a5a6;
+    color: white;
+}

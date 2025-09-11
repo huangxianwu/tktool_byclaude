@@ -252,17 +252,79 @@ function handleModalKeydown(event) {
 
 // 启动日志流
 function startLogStream() {
+    // 先加载历史日志
+    loadHistoryLogs();
+    
+    // 启动SSE连接
+    if (eventSource) {
+        eventSource.close();
+    }
+    
     eventSource = new EventSource(`/api/tasks/${taskId}/logs`);
     
     eventSource.onmessage = function(event) {
-        const log = JSON.parse(event.data);
-        addLogEntry(log);
+        try {
+            const log = JSON.parse(event.data);
+            addLogEntry({
+                message: log.message,
+                timestamp: log.timestamp
+            });
+        } catch (error) {
+            console.error('解析日志数据失败:', error);
+        }
     };
     
     eventSource.onerror = function(error) {
         console.error('SSE连接错误:', error);
-        // 可以在这里实现重连逻辑
+        // 连接错误时回退到轮询模式
+        eventSource.close();
+        setTimeout(() => {
+            loadLogs();
+            setInterval(loadLogs, 2000);
+        }, 1000);
     };
+}
+
+// 加载历史日志
+async function loadHistoryLogs() {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/logs/history`);
+        const logs = await response.json();
+        
+        const logsContainer = document.getElementById('executionLogs');
+        logsContainer.innerHTML = ''; // 清空现有日志
+        
+        logs.forEach(log => {
+            addLogEntry({
+                message: log.message,
+                timestamp: log.timestamp
+            });
+        });
+        
+    } catch (error) {
+        console.error('加载历史日志失败:', error);
+    }
+}
+
+// 轮询模式加载日志（作为SSE的备用方案）
+async function loadLogs() {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/logs/history`);
+        const logs = await response.json();
+        
+        const logsContainer = document.getElementById('executionLogs');
+        logsContainer.innerHTML = ''; // 清空现有日志
+        
+        logs.forEach(log => {
+            addLogEntry({
+                message: log.message,
+                timestamp: log.timestamp
+            });
+        });
+        
+    } catch (error) {
+        console.error('加载日志失败:', error);
+    }
 }
 
 // 添加日志条目

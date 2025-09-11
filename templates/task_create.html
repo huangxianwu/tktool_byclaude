@@ -10,6 +10,15 @@
         <!-- 表单字段将通过JS动态生成 -->
     </div>
     
+    <!-- Plus实例选择 -->
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="isPlusCheckbox" name="is_plus">
+            是否运行Plus (48G显存机器)
+        </label>
+        <small class="form-text text-muted">选中后将在高性能机器上执行任务</small>
+    </div>
+    
     <button type="submit">创建任务</button>
 </form>
 
@@ -165,6 +174,9 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
             });
         }
         
+        // 获取Plus选择状态
+        const isPlusChecked = document.getElementById('isPlusCheckbox').checked;
+        
         // 创建任务（后端将自动处理文件上传）
         const response = await fetch('/api/tasks', {
             method: 'POST',
@@ -173,7 +185,8 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
             },
             body: JSON.stringify({
                 workflow_id: workflowId,
-                data: taskData
+                data: taskData,
+                is_plus: isPlusChecked
             })
         });
         

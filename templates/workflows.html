@@ -75,19 +75,24 @@ function addNode() {
     const container = document.getElementById('nodesContainer');
     const nodeId = Date.now(); // 简单的时间戳作为临时ID
     
-    container.innerHTML += `
-        <div class="node-item">
-            <input type="text" placeholder="节点ID (可选)" name="node_id">
-            <input type="text" placeholder="节点名称" name="node_name" required>
-            <select name="node_type" required>
-                <option value="text">文本</option>
-                <option value="number">数字</option>
-                <option value="image">图片</option>
-                <option value="video">视频</option>
-            </select>
-            <button type="button" onclick="this.parentElement.remove()">删除</button>
-        </div>
+    // 创建新的节点元素
+    const nodeDiv = document.createElement('div');
+    nodeDiv.className = 'node-item';
+    
+    nodeDiv.innerHTML = `
+        <input type="text" placeholder="节点ID (可选)" name="node_id">
+        <input type="text" placeholder="节点名称" name="node_name" required>
+        <select name="node_type" required>
+            <option value="text">文本</option>
+            <option value="number">数字</option>
+            <option value="image">图片</option>
+            <option value="video">视频</option>
+        </select>
+        <button type="button" onclick="this.parentElement.remove()">删除</button>
     `;
+    
+    // 使用appendChild而不是innerHTML来避免清空已有内容
+    container.appendChild(nodeDiv);
 }
 
 // 提交工作流表单

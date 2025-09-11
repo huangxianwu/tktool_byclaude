@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="{{ url_for('static', filename='js/task_management.js') }}" defer></script>
+<div class="task-management">
+    <div class="header-section">
+        <h2>任务管理</h2>
+        <div class="queue-info">
+            <div class="queue-stats">
+                <span class="stat-item">排队任务: <span id="pending-count">0</span></span>
+                <span class="stat-item">运行任务: <span id="running-count">0</span></span>
+                <span class="stat-item">最大并发: <span id="max-concurrent">1</span></span>
+            </div>
+            <div class="refresh-controls">
+                <button class="btn btn-secondary" onclick="refreshTasks()">🔄 刷新</button>
+                <label class="auto-refresh">
+                    <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()"> 自动刷新
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="batch-controls">
+        <div class="selection-controls">
+            <label class="select-all">
+                <input type="checkbox" id="select-all" onchange="toggleSelectAll()"> 全选
+            </label>
+            <span class="selection-info">已选择: <span id="selected-count">0</span> 个任务</span>
+        </div>
+        
+        <div class="batch-actions">
+            <button class="btn btn-success" id="batch-start-btn" onclick="batchStartTasks()" disabled>批量启动</button>
+            <button class="btn btn-warning" id="batch-stop-btn" onclick="batchStopTasks()" disabled>批量停止</button>
+            <button class="btn btn-danger" id="batch-delete-btn" onclick="batchDeleteTasks()" disabled>批量删除</button>
+        </div>
+    </div>
+
+    <div class="task-table-container">
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th width="40">选择</th>
+                    <th>工作流名称</th>
+                    <th>任务ID</th>
+                    <th>节点数</th>
+                    <th>是否Plus</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="task-list">
+                <!-- 任务列表将通过JavaScript动态加载 -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="loading-indicator" id="loading" style="display: none;">
+        <div class="spinner">🔄</div>
+        <span>加载中...</span>
+    </div>
+
+    <div class="empty-state" id="empty-state" style="display: none;">
+        <div class="empty-icon">📋</div>
+        <h3>暂无任务</h3>
+        <p>您还没有创建任何任务</p>
+        <a href="/workflows" class="btn btn-primary">创建新任务</a>
+    </div>
+</div>
+
+<!-- 任务详情模态框 -->
+<div class="modal" id="task-detail-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>任务详情</h3>
+            <span class="close" onclick="closeTaskDetail()">&times;</span>
+        </div>
+        <div class="modal-body" id="task-detail-content">
+            <!-- 任务详情内容 -->
+        </div>
+    </div>
+</div>
+
+<!-- 批量操作确认模态框 -->
+<div class="modal" id="batch-confirm-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="batch-confirm-title">确认操作</h3>
+            <span class="close" onclick="closeBatchConfirm()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p id="batch-confirm-message"></p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeBatchConfirm()">取消</button>
+                <button class="btn btn-primary" id="batch-confirm-btn" onclick="confirmBatchOperation()">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.task-management {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.queue-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.queue-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.stat-item {
+    background: #f5f5f5;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #666;
+}
+
+.refresh-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.batch-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.selection-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.selection-info {
+    color: #666;
+    font-size: 14px;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.task-table-container {
+    overflow-x: auto;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.task-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.task-table th {
+    background: #f5f5f5;
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+    font-weight: 600;
+}
+
+.task-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.task-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-ready { background: #e8f5e8; color: #2d6a2d; }
+.status-pending { background: #fff3cd; color: #856404; }
+.status-queued { background: #cce5ff; color: #004085; }
+.status-running { background: #ffe4b3; color: #663c00; }
+.status-success { background: #d4edda; color: #155724; }
+.status-failed { background: #f8d7da; color: #721c24; }
+.status-stopped { background: #e2e3e5; color: #383d41; }
+
+.task-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary { background: #007bff; color: white; }
+.btn-primary:hover { background: #0056b3; }
+
+.btn-success { background: #28a745; color: white; }
+.btn-success:hover { background: #1e7e34; }
+
+.btn-warning { background: #ffc107; color: #212529; }
+.btn-warning:hover { background: #e0a800; }
+
+.btn-danger { background: #dc3545; color: white; }
+.btn-danger:hover { background: #c82333; }
+
+.btn-secondary { background: #6c757d; color: white; }
+.btn-secondary:hover { background: #5a6268; }
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.loading-indicator {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.spinner {
+    font-size: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #aaa;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-actions {
+    text-align: right;
+    margin-top: 20px;
+    gap: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.task-checkbox {
+    margin: 0;
+}
+
+.datetime {
+    font-size: 12px;
+    color: #666;
+}
+
+.auto-refresh {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #666;
+}
+</style>
+{% endblock %}

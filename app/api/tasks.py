@@ -2,17 +2,18 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Task, TaskData, Node
 from app.services.runninghub import RunningHubService
-from app.managers.TaskQueueManager import TaskQueueManager
+from app.services.task_controller import TaskController
 import uuid
 import base64
 
 bp = Blueprint('tasks', __name__, url_prefix='/api/tasks')
+task_controller = TaskController()
 
 @bp.route('', methods=['GET'])
 def get_tasks():
-    """获取所有任务"""
-    tasks = Task.query.all()
-    return jsonify([task.to_dict() for task in tasks])
+    """获取所有任务（包含工作流信息）"""
+    tasks = task_controller.get_tasks_with_workflow_info()
+    return jsonify(tasks)
 
 @bp.route('', methods=['POST'])
 def create_task():
@@ -25,8 +26,9 @@ def create_task():
     # 生成任务ID
     task_id = str(uuid.uuid4())
     
-    # 创建任务
-    task = Task(task_id=task_id, workflow_id=data['workflow_id'])
+    # 创建任务（默认状态为READY）
+    is_plus = data.get('is_plus', False)  # 获取是否Plus实例标志
+    task = Task(task_id=task_id, workflow_id=data['workflow_id'], status='READY', is_plus=is_plus)
     db.session.add(task)
     
     # 处理任务数据并集成文件上传
@@ -95,43 +97,42 @@ def create_task():
 
 @bp.route('/<task_id>', methods=['GET'])
 def get_task(task_id):
-    """获取特定任务"""
-    task = Task.query.get_or_404(task_id)
+    """获取特定任务详细信息"""
+    task_details = task_controller.get_task_details(task_id)
+    if not task_details:
+        return jsonify({'error': 'Task not found'}), 404
     
-    # 获取任务数据
-    task_data = TaskData.query.filter_by(task_id=task_id).all()
-    
-    result = task.to_dict()
-    result['data'] = [td.to_dict() for td in task_data]
-    
-    return jsonify(result)
+    return jsonify(task_details)
 
-@bp.route('/<task_id>/run', methods=['POST'])
-def run_task(task_id):
-    """运行任务"""
-    task = Task.query.get_or_404(task_id)
-    
-    # 检查任务状态
-    if task.status not in ['PENDING', 'FAILED']:
-        return jsonify({'error': 'Task is already running or completed'}), 400
-    
-    # 启动任务
-    task_manager = TaskQueueManager()
-    success = task_manager.start_task(task_id)
+@bp.route('/<task_id>/start', methods=['POST'])
+def start_task(task_id):
+    """启动任务"""
+    success, message = task_controller.start_single_task(task_id)
     
     if success:
-        return jsonify({'message': 'Task started'})
+        return jsonify({'message': message})
     else:
-        return jsonify({'error': 'Task is already running'}), 400
+        return jsonify({'error': message}), 400
+
+@bp.route('/<task_id>/stop', methods=['POST'])
+def stop_task(task_id):
+    """停止任务"""
+    success, message = task_controller.stop_single_task(task_id)
+    
+    if success:
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': message}), 400
 
 @bp.route('/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
     """删除任务"""
-    task = Task.query.get_or_404(task_id)
-    db.session.delete(task)
-    db.session.commit()
+    success, message = task_controller.delete_single_task(task_id)
     
-    return jsonify({'message': 'Task deleted'})
+    if success:
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': message}), 400
 
 @bp.route('/upload', methods=['POST'])
 def upload_file():
@@ -160,3 +161,104 @@ def upload_file():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# 批量操作接口
+@bp.route('/batch/start', methods=['POST'])
+def batch_start_tasks():
+    """批量启动任务"""
+    data = request.get_json()
+    if not data or 'task_ids' not in data:
+        return jsonify({'error': 'Missing task_ids'}), 400
+    
+    task_ids = data['task_ids']
+    if not isinstance(task_ids, list) or not task_ids:
+        return jsonify({'error': 'task_ids must be a non-empty list'}), 400
+    
+    success, message = task_controller.batch_start_tasks(task_ids)
+    
+    if success:
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': message}), 400
+
+@bp.route('/batch/stop', methods=['POST'])
+def batch_stop_tasks():
+    """批量停止任务"""
+    data = request.get_json()
+    if not data or 'task_ids' not in data:
+        return jsonify({'error': 'Missing task_ids'}), 400
+    
+    task_ids = data['task_ids']
+    if not isinstance(task_ids, list) or not task_ids:
+        return jsonify({'error': 'task_ids must be a non-empty list'}), 400
+    
+    success, message = task_controller.batch_stop_tasks(task_ids)
+    
+    if success:
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': message}), 400
+
+@bp.route('/batch/delete', methods=['DELETE'])
+def batch_delete_tasks():
+    """批量删除任务"""
+    data = request.get_json()
+    if not data or 'task_ids' not in data:
+        return jsonify({'error': 'Missing task_ids'}), 400
+    
+    task_ids = data['task_ids']
+    if not isinstance(task_ids, list) or not task_ids:
+        return jsonify({'error': 'task_ids must be a non-empty list'}), 400
+    
+    success, message = task_controller.batch_delete_tasks(task_ids)
+    
+    if success:
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': message}), 400
+
+# 状态和统计接口
+@bp.route('/queue/status', methods=['GET'])
+def get_queue_status():
+    """获取队列状态"""
+    status = task_controller.get_queue_status()
+    return jsonify(status)
+
+@bp.route('/statistics', methods=['GET'])
+def get_task_statistics():
+    """获取任务统计信息"""
+    stats = task_controller.get_task_statistics()
+    return jsonify(stats)
+
+@bp.route('/<task_id>/progress', methods=['GET'])
+def get_task_progress(task_id):
+    """获取任务进度"""
+    progress = task_controller.get_task_progress(task_id)
+    if progress is not None:
+        return jsonify(progress)
+    else:
+        return jsonify({'error': 'Progress not available'}), 404
+
+@bp.route('/<task_id>/outputs', methods=['GET'])
+def get_task_outputs(task_id):
+    """获取任务输出文件列表"""
+    outputs = task_controller.get_task_outputs(task_id)
+    return jsonify(outputs)
+
+@bp.route('/<task_id>/outputs/<output_name>', methods=['GET'])
+def download_task_output(task_id, output_name):
+    """下载任务输出文件"""
+    file_data = task_controller.download_task_output(task_id, output_name)
+    if file_data:
+        from flask import make_response
+        response = make_response(file_data)
+        response.headers['Content-Disposition'] = f'attachment; filename={output_name}'
+        return response
+    else:
+        return jsonify({'error': 'File not found'}), 404
+
+@bp.route('/<task_id>/logs', methods=['GET'])
+def get_task_logs(task_id):
+    """获取任务执行日志"""
+    logs = task_controller.get_task_logs(task_id)
+    return jsonify(logs)

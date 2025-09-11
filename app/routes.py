@@ -19,7 +19,12 @@ def task_create(workflow_id):
 
 @bp.route('/tasks')
 def tasks():
-    return render_template('tasks.html')
+    return render_template('task_management.html')
+
+@bp.route('/queue')  
+def queue():
+    """任务队列管理页面"""
+    return render_template('task_management.html')
 
 @bp.route('/tasks/<task_id>')
 def task_detail(task_id):
