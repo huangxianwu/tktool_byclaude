@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>任务管理</h2>
+</div>
+
+<div class="task-list" id="taskList">
+    <!-- 任务列表将通过JS动态加载 -->
+</div>
+
+<script>
+// 加载任务列表
+async function loadTasks() {
+    try {
+        const response = await fetch('/api/tasks');
+        const tasks = await response.json();
+        
+        const container = document.getElementById('taskList');
+        container.innerHTML = tasks.map(task => `
+            <div class="task-item">
+                <h3>任务 #${task.task_id.slice(0, 8)}</h3>
+                <p>工作流ID: ${task.workflow_id}</p>
+                <p>状态: <span class="status-${task.status.toLowerCase()}">${task.status}</span></p>
+                <p>创建时间: ${new Date(task.created_at).toLocaleString()}</p>
+                <div class="actions">
+                    <button onclick="viewTask('${task.task_id}')">查看详情</button>
+                    ${task.status === 'PENDING' || task.status === 'FAILED' ? 
+                        `<button onclick="runTask('${task.task_id}')">运行</button>` : ''}
+                    <button onclick="deleteTask('${task.task_id}')">删除</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('加载任务失败:', error);
+    }
+}
+
+// 运行任务
+async function runTask(taskId) {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/run`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('任务已开始运行');
+            loadTasks();
+        } else {
+            alert('启动任务失败');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('启动任务失败');
+    }
+}
+
+// 查看任务详情
+function viewTask(taskId) {
+    window.location.href = `/tasks/${taskId}`;
+}
+
+// 删除任务
+async function deleteTask(taskId) {
+    if (confirm('确定要删除这个任务吗？')) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert('任务已删除');
+                loadTasks();
+            } else {
+                alert('删除任务失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('删除任务失败');
+        }
+    }
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', loadTasks);
+</script>
+{% endblock %}

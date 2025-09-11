@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>创建任务 - 工作流: <span id="workflowName"></span></h2>
+</div>
+
+<form id="taskForm">
+    <div id="formFields">
+        <!-- 表单字段将通过JS动态生成 -->
+    </div>
+    
+    <button type="submit">创建任务</button>
+</form>
+
+<script>
+let workflowId = window.location.pathname.split('/').pop();
+let workflow = null;
+
+// 加载工作流详情
+async function loadWorkflow() {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}`);
+        workflow = await response.json();
+        
+        document.getElementById('workflowName').textContent = workflow.name;
+        renderFormFields();
+    } catch (error) {
+        console.error('加载工作流失败:', error);
+    }
+}
+
+// 渲染表单字段
+function renderFormFields() {
+    const container = document.getElementById('formFields');
+    
+    container.innerHTML = workflow.nodes.map(node => {
+        let inputHtml = '';
+        
+        switch(node.node_type) {
+            case 'text':
+                inputHtml = `<input type="text" name="${node.node_id}" placeholder="请输入${node.node_name}" required>`;
+                break;
+            case 'number':
+                inputHtml = `<input type="number" name="${node.node_id}" placeholder="请输入${node.node_name}" required>`;
+                break;
+            case 'image':
+                inputHtml = `
+                    <input type="file" name="${node.node_id}" accept="image/*" required>
+                    <div class="image-preview" id="preview-${node.node_id}" style="display: none;">
+                        <img src="" alt="预览图" style="max-width: 200px; max-height: 200px;">
+                    </div>
+                `;
+                break;
+            case 'video':
+                inputHtml = `
+                    <input type="file" name="${node.node_id}" accept="video/*" required>
+                    <div class="video-preview" id="preview-${node.node_id}" style="display: none;">
+                        <video controls style="max-width: 300px; max-height: 200px;">
+                            <source src="" type="video/mp4">
+                        </video>
+                    </div>
+                `;
+                break;
+        }
+        
+        return `
+            <div class="form-group">
+                <label>${node.node_name} (${node.node_type}):</label>
+                ${inputHtml}
+            </div>
+        `;
+    }).join('');
+    
+    // 添加文件预览功能
+    addFilePreviewListeners();
+}
+
+// 添加文件预览监听器
+function addFilePreviewListeners() {
+    // 图片预览
+    document.querySelectorAll('input[type="file"][accept="image/*"]').forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const preview = document.getElementById(`preview-${this.name}`);
+                const img = preview.querySelector('img');
+                img.src = URL.createObjectURL(file);
+                preview.style.display = 'block';
+            }
+        });
+    });
+    
+    // 视频预览
+    document.querySelectorAll('input[type="file"][accept="video/*"]').forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const preview = document.getElementById(`preview-${this.name}`);
+                const video = preview.querySelector('video source');
+                video.src = URL.createObjectURL(file);
+                preview.querySelector('video').load();
+                preview.style.display = 'block';
+            }
+        });
+    });
+}
+
+// 提交任务表单
+document.getElementById('taskForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const taskData = [];
+    
+    // 显示加载状态
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = '处理中...';
+    submitBtn.disabled = true;
+    
+    try {
+        // 构建任务数据，包含文件的base64数据
+        for (const node of workflow.nodes) {
+            const value = formData.get(node.node_id);
+            let fieldValue = value;
+            
+            if (node.node_type === 'image' || node.node_type === 'video') {
+                // 文件类型：转换为base64数据URL
+                if (value && value instanceof File) {
+                    try {
+                        fieldValue = await fileToBase64(value);
+                    } catch (error) {
+                        alert(`文件处理失败: ${error.message}`);
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        return;
+                    }
+                }
+            }
+            
+            // 根据节点类型设置正确的fieldName（RunningHub标准字段名）
+            let fieldName;
+            switch(node.node_type) {
+                case 'image':
+                    fieldName = 'image';
+                    break;
+                case 'video':
+                    fieldName = 'video';
+                    break;
+                case 'text':
+                    fieldName = 'text';
+                    break;
+                case 'number':
+                    fieldName = 'int';
+                    break;
+                default:
+                    fieldName = node.node_type; // fallback to node_type
+            }
+            
+            taskData.push({
+                node_id: node.node_id,
+                field_name: fieldName,
+                field_value: fieldValue
+            });
+        }
+        
+        // 创建任务（后端将自动处理文件上传）
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workflow_id: workflowId,
+                data: taskData
+            })
+        });
+        
+        if (response.ok) {
+            const task = await response.json();
+            alert('任务创建成功！');
+            window.location.href = `/tasks/${task.task_id}`;
+        } else {
+            const error = await response.json();
+            alert(`创建任务失败: ${error.error || '未知错误'}`);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('创建任务失败');
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+// 文件转base64函数
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', loadWorkflow);
+</script>
+{% endblock %}

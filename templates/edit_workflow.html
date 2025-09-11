@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script>
+// 简单的消息显示函数
+function showMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message message-${type}`;
+    messageDiv.textContent = message;
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 4px;
+        color: white;
+        z-index: 10000;
+        max-width: 300px;
+        background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+    `;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+</script>
+<div class="page-header">
+    <h2>编辑工作流模板</h2>
+</div>
+
+<div class="workflow-edit">
+    <form id="editWorkflowForm">
+        <div class="form-group">
+            <label>工作流名称:</label>
+            <input type="text" id="workflowName" value="{{ workflow.name }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label>节点配置:</label>
+            <div id="nodesContainer">
+                {% for node in workflow.nodes %}
+                <div class="node-item">
+                    <input type="text" placeholder="节点ID (可选)" name="node_id" value="{{ node.node_id }}">
+                    <input type="text" placeholder="节点名称" name="node_name" value="{{ node.node_name }}" required>
+                    <select name="node_type" required>
+                        <option value="text" {% if node.node_type == 'text' %}selected{% endif %}>文本</option>
+                        <option value="number" {% if node.node_type == 'number' %}selected{% endif %}>数字</option>
+                        <option value="image" {% if node.node_type == 'image' %}selected{% endif %}>图片</option>
+                        <option value="video" {% if node.node_type == 'video' %}selected{% endif %}>视频</option>
+                    </select>
+                    <button type="button" onclick="this.parentElement.remove()">删除</button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="addNode()">添加节点</button>
+        </div>
+        
+        <button type="submit">保存修改</button>
+        <button type="button" onclick="window.history.back()">取消</button>
+    </form>
+</div>
+
+<script>
+// 添加节点
+function addNode() {
+    const container = document.getElementById('nodesContainer');
+    const nodeId = Date.now(); // 简单的时间戳作为临时ID
+    
+    container.innerHTML += `
+        <div class="node-item">
+            <input type="text" placeholder="节点ID (可选)" name="node_id">
+            <input type="text" placeholder="节点名称" name="node_name" required>
+            <select name="node_type" required>
+                <option value="text">文本</option>
+                <option value="number">数字</option>
+                <option value="image">图片</option>
+                <option value="video">视频</option>
+            </select>
+            <button type="button" onclick="this.parentElement.remove()">删除</button>
+        </div>
+    `;
+}
+
+// 提交编辑表单
+document.getElementById('editWorkflowForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const nodes = [];
+    
+    // 收集节点数据
+    document.querySelectorAll('.node-item').forEach(node => {
+        const nodeIdInput = node.querySelector('[name="node_id"]');
+        const nodeData = {
+            node_name: node.querySelector('[name="node_name"]').value,
+            node_type: node.querySelector('[name="node_type"]').value
+        };
+        
+        // 只有在用户输入了节点ID时才包含它
+        if (nodeIdInput && nodeIdInput.value.trim()) {
+            nodeData.node_id = nodeIdInput.value.trim();
+        }
+        
+        nodes.push(nodeData);
+    });
+    
+    const workflowData = {
+        name: document.getElementById('workflowName').value,
+        nodes: nodes
+    };
+    
+    try {
+        const response = await fetch('/api/workflows/{{ workflow.workflow_id }}', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(workflowData)
+        });
+        
+        if (response.ok) {
+            showMessage('工作流更新成功！', 'success');
+            setTimeout(() => {
+                window.location.href = '/workflows';
+            }, 1000);
+        } else {
+            const errorData = await response.json();
+            alert('更新工作流失败: ' + (errorData.error || response.status));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('更新工作流失败: ' + error.message);
+    }
+});
+</script>
+{% endblock %}

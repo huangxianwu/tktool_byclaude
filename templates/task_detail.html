@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>任务详情 #<span id="taskId"></span></h2>
+    <p>状态: <span id="taskStatus"></span></p>
+    <div class="task-actions">
+        <button id="runTaskBtn" onclick="runTask()" class="btn btn-primary" style="display: none;">执行任务</button>
+        <button id="deleteTaskBtn" onclick="deleteTask()" class="btn btn-danger" style="margin-left: 10px;">删除任务</button>
+    </div>
+</div>
+
+<div class="task-detail">
+    <!-- 原始表单数据 -->
+    <section>
+        <h3>输入参数</h3>
+        <ul id="inputDataList">
+            <!-- 输入数据将通过JS动态加载 -->
+        </ul>
+    </section>
+
+    <!-- 执行日志流 -->
+    <section>
+        <h3>执行日志</h3>
+        <div id="executionLogs" class="log-stream">
+            <!-- 日志将通过SSE动态加载 -->
+        </div>
+    </section>
+
+    <!-- 结果文件预览 -->
+    <section>
+        <h3>输出结果</h3>
+        <div id="resultPreview" class="result-gallery">
+            <!-- 结果将通过JS动态加载 -->
+        </div>
+    </section>
+</div>
+
+<script>
+let taskId = window.location.pathname.split('/').pop();
+let eventSource = null;
+
+// 加载任务详情
+async function loadTaskDetail() {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`);
+        const task = await response.json();
+        
+        document.getElementById('taskId').textContent = task.task_id;
+        document.getElementById('taskStatus').textContent = task.status;
+        
+        // 根据任务状态显示执行按钮
+        const runBtn = document.getElementById('runTaskBtn');
+        if (task.status === 'PENDING' || task.status === 'FAILED') {
+            runBtn.style.display = 'inline-block';
+        } else {
+            runBtn.style.display = 'none';
+        }
+        
+        // 显示输入数据
+        renderInputData(task.data);
+        
+        // 显示结果文件
+        renderResults(task.data);
+        
+        // 启动日志流
+        startLogStream();
+        
+    } catch (error) {
+        console.error('加载任务详情失败:', error);
+    }
+}
+
+// 渲染输入数据
+function renderInputData(data) {
+    const container = document.getElementById('inputDataList');
+    
+    container.innerHTML = data.map(item => {
+        let valueDisplay = item.field_value;
+        
+        // 如果是文件类型，显示预览
+        if (item.file_url) {
+            if (item.file_url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                valueDisplay = `<img src="${item.file_url}" alt="结果图片" style="max-width: 300px;">`;
+            } else if (item.file_url.match(/\.(mp4|avi|mov)$/i)) {
+                valueDisplay = `<video controls style="max-width: 300px;"><source src="${item.file_url}"></video>`;
+            }
+        }
+        
+        return `<li><strong>${item.field_name}:</strong> ${valueDisplay}</li>`;
+    }).join('');
+}
+
+// 渲染结果文件
+async function renderResults(data) {
+    const container = document.getElementById('resultPreview');
+    
+    // 获取任务的输出文件
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/outputs`);
+        const outputs = await response.json();
+        
+        if (!outputs || outputs.length === 0) {
+            container.innerHTML = '<p class="no-results">暂无结果文件</p>';
+            return;
+        }
+        
+        container.innerHTML = outputs.map(output => createResultCard(output)).join('');
+        
+        // 添加事件监听器
+        setupGalleryListeners();
+        
+    } catch (error) {
+        console.error('加载输出文件失败:', error);
+        container.innerHTML = '<p class="error">加载结果文件失败</p>';
+    }
+}
+
+// 创建结果卡片
+function createResultCard(output) {
+    const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
+    const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv)$/);
+    
+    let cardContent = '';
+    let previewContent = '';
+    
+    if (isImage) {
+        const thumbnailUrl = output.thumbnail_url || output.static_url;
+        previewContent = `
+            <div class="image-preview">
+                <img src="${thumbnailUrl}" alt="输出图片" loading="lazy" onclick="openImageModal('${output.static_url}')">
+                <div class="image-overlay">
+                    <button class="btn-preview" onclick="openImageModal('${output.static_url}')">
+                        <i class="icon-zoom"></i> 预览
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (isVideo) {
+        previewContent = `
+            <div class="video-preview">
+                <video poster="${output.thumbnail_url || ''}" onclick="this.play()">
+                    <source src="${output.static_url}" type="video/${output.file_type}">
+                </video>
+                <div class="video-overlay">
+                    <button class="btn-play">
+                        <i class="icon-play"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        previewContent = `
+            <div class="file-preview">
+                <div class="file-icon">
+                    <i class="icon-file"></i>
+                </div>
+                <div class="file-name">${output.file_type.toUpperCase()}</div>
+            </div>
+        `;
+    }
+    
+    const fileSize = formatFileSize(output.file_size);
+    const createdTime = new Date(output.created_at).toLocaleString();
+    
+    return `
+        <div class="result-card" data-file-type="${output.file_type}">
+            ${previewContent}
+            <div class="card-info">
+                <div class="card-title">节点 ${output.node_id}</div>
+                <div class="card-meta">
+                    <span class="file-size">${fileSize}</span>
+                    <span class="created-time">${createdTime}</span>
+                </div>
+                <div class="card-actions">
+                    <a href="${output.static_url}" download class="btn btn-download">
+                        <i class="icon-download"></i> 下载
+                    </a>
+                    <a href="${output.file_url}" target="_blank" class="btn btn-external">
+                        <i class="icon-external"></i> 原始链接
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 文件大小格式化
+function formatFileSize(bytes) {
+    if (!bytes) return '未知大小';
+    
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 设置画廊监听器
+function setupGalleryListeners() {
+    // 为视频添加播放控制
+    document.querySelectorAll('.video-preview video').forEach(video => {
+        video.addEventListener('click', function() {
+            if (this.paused) {
+                this.play();
+                this.nextElementSibling.style.display = 'none';
+            } else {
+                this.pause();
+                this.nextElementSibling.style.display = 'flex';
+            }
+        });
+    });
+}
+
+// 打开图片模态框
+function openImageModal(imageUrl) {
+    // 创建模态框
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="closeImageModal()"></div>
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeImageModal()">&times;</button>
+            <img src="${imageUrl}" alt="预览图片">
+            <div class="modal-actions">
+                <a href="${imageUrl}" download class="btn btn-download">下载图片</a>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // 添加键盘支持
+    document.addEventListener('keydown', handleModalKeydown);
+}
+
+// 关闭图片模态框
+function closeImageModal() {
+    const modal = document.querySelector('.image-modal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleModalKeydown);
+    }
+}
+
+// 模态框键盘处理
+function handleModalKeydown(event) {
+    if (event.key === 'Escape') {
+        closeImageModal();
+    }
+}
+
+// 启动日志流
+function startLogStream() {
+    eventSource = new EventSource(`/api/tasks/${taskId}/logs`);
+    
+    eventSource.onmessage = function(event) {
+        const log = JSON.parse(event.data);
+        addLogEntry(log);
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('SSE连接错误:', error);
+        // 可以在这里实现重连逻辑
+    };
+}
+
+// 添加日志条目
+function addLogEntry(log) {
+    const logsContainer = document.getElementById('executionLogs');
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+    
+    const timestamp = document.createElement('span');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = `[${new Date(log.timestamp).toLocaleTimeString()}]`;
+    
+    const message = document.createElement('span');
+    message.className = 'message';
+    
+    // 检查是否是JSON格式的消息
+    if (log.message.trim().startsWith('{') || log.message.includes('"nodeInfoList"')) {
+        const pre = document.createElement('pre');
+        pre.className = 'json-log';
+        pre.textContent = log.message;
+        message.appendChild(pre);
+    } else {
+        message.textContent = log.message;
+    }
+    
+    logEntry.appendChild(timestamp);
+    logEntry.appendChild(message);
+    logsContainer.appendChild(logEntry);
+    
+    // 自动滚动到底部
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+}
+
+// 执行任务
+async function runTask() {
+    const runBtn = document.getElementById('runTaskBtn');
+    const originalText = runBtn.textContent;
+    
+    try {
+        runBtn.textContent = '执行中...';
+        runBtn.disabled = true;
+        
+        const response = await fetch(`/api/tasks/${taskId}/run`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('任务开始执行！');
+            // 重新加载任务详情以更新状态
+            loadTaskDetail();
+        } else {
+            const error = await response.json();
+            alert(`执行失败: ${error.error || '未知错误'}`);
+        }
+    } catch (error) {
+        console.error('执行任务失败:', error);
+        alert('执行任务失败');
+    } finally {
+        runBtn.textContent = originalText;
+        runBtn.disabled = false;
+    }
+}
+
+// 删除任务
+async function deleteTask() {
+    if (!confirm('确定要删除这个任务吗？')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('任务删除成功！');
+            window.location.href = '/tasks';
+        } else {
+            const error = await response.json();
+            alert(`删除失败: ${error.error || '未知错误'}`);
+        }
+    } catch (error) {
+        console.error('删除任务失败:', error);
+        alert('删除任务失败');
+    }
+}
+
+// 页面卸载时关闭SSE连接
+window.addEventListener('beforeunload', () => {
+    if (eventSource) {
+        eventSource.close();
+    }
+});
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', loadTaskDetail);
+</script>
+{% endblock %}
