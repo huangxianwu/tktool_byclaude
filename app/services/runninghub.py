@@ -322,9 +322,20 @@ class RunningHubService:
             file_list = []
             for output in outputs:
                 if isinstance(output, dict) and 'fileUrl' in output:
+                    # 从fileUrl中提取文件名
+                    file_url = output['fileUrl']
+                    file_name = file_url.split('/')[-1] if '/' in file_url else 'output.file'
+                    
+                    # 从fileType或URL中推断文件类型
+                    file_type = output.get('fileType', '')
+                    if not file_type and '.' in file_name:
+                        file_type = file_name.split('.')[-1]
+                    
                     file_list.append({
-                        'name': output.get('fileName', 'output.file'),
-                        'url': output['fileUrl']
+                        'name': file_name,
+                        'url': file_url,
+                        'type': file_type,
+                        'node_id': output.get('nodeId', '')
                     })
             return file_list
         return []

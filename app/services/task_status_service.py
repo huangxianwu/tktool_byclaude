@@ -256,13 +256,12 @@ class TaskStatusService:
     
     def get_task_outputs(self, task_id):
         """获取任务输出文件"""
-        task = Task.query.get(task_id)
-        if not task or not task.runninghub_task_id:
-            return []
-        
         try:
-            outputs = self.runninghub_service.get_task_outputs(task.runninghub_task_id)
-            return outputs or []
+            # 使用FileManager的fallback方法
+            from app.services.file_manager import FileManager
+            file_manager = FileManager()
+            outputs = file_manager.get_task_outputs_with_fallback(task_id)
+            return outputs
         except Exception as e:
             logger.error(f"Error getting task outputs for {task_id}: {e}")
             return []

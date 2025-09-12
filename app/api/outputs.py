@@ -10,7 +10,7 @@ def get_task_outputs(task_id):
     """获取任务的输出文件列表"""
     try:
         file_manager = FileManager()
-        outputs = file_manager.get_task_outputs(task_id)
+        outputs = file_manager.get_task_outputs_with_fallback(task_id)
         return jsonify(outputs)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

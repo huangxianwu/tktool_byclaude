@@ -254,3 +254,64 @@ class TaskController:
         except Exception as e:
             logger.error(f"Error fetching task logs for {task_id}: {e}")
             return []
+    
+    def get_task_logs_history(self, task_id):
+        """获取任务历史日志"""
+        return self.get_task_logs(task_id)
+    
+    def refresh_task_files(self, task_id):
+        """刷新任务输出文件"""
+        try:
+            from app.services.runninghub import RunningHubService
+            from app.services.file_manager import FileManager
+            
+            # 检查任务是否存在
+            task = Task.query.get(task_id)
+            if not task:
+                raise Exception(f"任务 {task_id} 不存在")
+            
+            # 初始化服务
+            runninghub_service = RunningHubService()
+            file_manager = FileManager()
+            
+            # 从RunningHub获取最新的输出文件
+            try:
+                if not task.runninghub_task_id:
+                    raise Exception(f"任务 {task_id} 没有关联的RunningHub任务ID")
+                    
+                outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
+                if not outputs:
+                    logger.info(f"任务 {task_id} 在RunningHub中没有输出文件")
+                    return 0
+                
+                updated_count = 0
+                
+                # 处理每个输出文件
+                for output in outputs:
+                    try:
+                        # 保存文件到本地
+                        saved_output = file_manager.save_output_file(
+                            task_id=task_id,
+                            file_name=output.get('name', ''),
+                            file_url=output.get('url', ''),
+                            file_type=output.get('type', 'file')
+                        )
+                        
+                        if saved_output:
+                            updated_count += 1
+                            logger.info(f"成功保存文件: {output.get('name')}")
+                        
+                    except Exception as file_error:
+                        logger.error(f"保存文件失败 {output.get('name')}: {file_error}")
+                        continue
+                
+                logger.info(f"任务 {task_id} 文件刷新完成，更新了 {updated_count} 个文件")
+                return updated_count
+                
+            except Exception as hub_error:
+                logger.error(f"从RunningHub获取输出文件失败: {hub_error}")
+                raise Exception(f"无法从RunningHub获取输出文件: {str(hub_error)}")
+                
+        except Exception as e:
+            logger.error(f"刷新任务文件失败 {task_id}: {e}")
+            raise e

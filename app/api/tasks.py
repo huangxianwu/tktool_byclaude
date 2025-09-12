@@ -267,5 +267,21 @@ def get_task_logs(task_id):
 @bp.route('/<task_id>/logs/history', methods=['GET'])
 def get_task_logs_history(task_id):
     """获取任务历史日志"""
-    logs = task_controller.get_task_logs(task_id)
+    logs = task_controller.get_task_logs_history(task_id)
     return jsonify(logs)
+
+@bp.route('/<task_id>/refresh-files', methods=['POST'])
+def refresh_task_files(task_id):
+    """刷新任务输出文件"""
+    try:
+        updated_count = task_controller.refresh_task_files(task_id)
+        return jsonify({
+            'success': True,
+            'updated_count': updated_count,
+            'message': f'成功更新 {updated_count} 个文件'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500

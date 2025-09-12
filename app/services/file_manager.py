@@ -161,11 +161,22 @@ class FileManager:
     
     def get_task_outputs(self, task_id):
         """获取任务的输出文件列表"""
+        print(f"DEBUG FileManager: Querying outputs for task_id: {task_id}")
         outputs = TaskOutput.query.filter_by(task_id=task_id).all()
+        print(f"DEBUG FileManager: Query returned {len(outputs)} outputs")
         
         result = []
         for output in outputs:
+            # 生成文件名
+            filename = f"node_{output.node_id}_output.{output.file_type}"
+            
+            # 优先使用本地文件URL，如果本地文件不存在则使用原始URL
+            local_url = self._get_static_url(output.local_path)
+            file_url = local_url if local_url and os.path.exists(output.local_path) else output.file_url
+            
             result.append({
+                'name': filename,
+                'url': file_url,
                 'id': output.id,
                 'node_id': output.node_id,
                 'file_url': output.file_url,
@@ -180,7 +191,179 @@ class FileManager:
         
         return result
     
+    def get_task_outputs_with_fallback(self, task_id):
+        """获取任务输出文件列表，如果没有本地记录则从RunningHub获取并补充字段"""
+        # 先尝试获取本地记录
+        local_outputs = self.get_task_outputs(task_id)
+        if local_outputs:
+            return local_outputs
+        
+        # 如果没有本地记录，从RunningHub获取并补充必要字段
+        from app.models.Task import Task
+        task = Task.query.get(task_id)
+        if not task or not task.runninghub_task_id:
+            return []
+        
+        try:
+            from app.services.runninghub import RunningHubService
+            runninghub_service = RunningHubService()
+            remote_outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
+            
+            # 补充前端需要的字段
+            result = []
+            for i, output in enumerate(remote_outputs):
+                # 从URL推断文件类型
+                file_url = output.get('url', '')
+                file_name = output.get('name', 'output.file')
+                file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+                
+                result.append({
+                    'name': file_name,
+                    'url': file_url,
+                    'id': None,
+                    'node_id': f'node_{i}',
+                    'file_url': file_url,
+                    'local_path': None,
+                    'thumbnail_path': None,
+                    'file_type': file_extension,
+                    'file_size': None,
+                    'static_url': file_url,  # 直接使用远程URL
+                    'thumbnail_url': file_url if file_extension.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'] else None,
+                    'created_at': None
+                })
+            
+            return result
+            
+        except Exception as e:
+            current_app.logger.error(f"Error getting remote outputs for task {task_id}: {e}")
+            return []
+    
+    def save_output_file(self, task_id, file_name, file_url, file_type='file'):
+        """保存单个输出文件"""
+        try:
+            if not file_url or not file_name:
+                return None
+            
+            # 下载文件
+            response = requests.get(file_url, timeout=30)
+            if response.status_code != 200:
+                current_app.logger.error(f"Failed to download {file_url}: {response.status_code}")
+                return None
+            
+            # 确定文件扩展名
+            file_ext = os.path.splitext(file_name)[1] or '.png'
+            
+            # 生成本地文件路径
+            if file_type in ['image', 'png', 'jpg', 'jpeg', 'gif']:
+                local_dir = os.path.join(self.base_dir, 'images', task_id)
+            elif file_type in ['video', 'mp4', 'avi', 'mov']:
+                local_dir = os.path.join(self.base_dir, 'videos', task_id)
+            else:
+                local_dir = os.path.join(self.base_dir, 'documents', task_id)
+            
+            os.makedirs(local_dir, exist_ok=True)
+            
+            # 生成唯一文件名
+            base_name = os.path.splitext(file_name)[0]
+            local_path = os.path.join(local_dir, f"{base_name}{file_ext}")
+            
+            # 如果文件已存在，添加序号
+            counter = 1
+            while os.path.exists(local_path):
+                local_path = os.path.join(local_dir, f"{base_name}_{counter}{file_ext}")
+                counter += 1
+            
+            # 保存文件
+            with open(local_path, 'wb') as f:
+                f.write(response.content)
+            
+            # 生成缩略图（仅图片）
+            thumbnail_path = None
+            if file_type in ['image', 'png', 'jpg', 'jpeg', 'gif']:
+                try:
+                    thumbnail_path = self._generate_thumbnail_for_file(local_path, task_id)
+                except Exception as thumb_error:
+                    current_app.logger.warning(f"Failed to generate thumbnail for {local_path}: {thumb_error}")
+            
+            # 保存到数据库
+            file_size = len(response.content)
+            static_url = self._get_static_url(local_path)
+            thumbnail_url = self._get_static_url(thumbnail_path) if thumbnail_path else None
+            
+            # 检查是否已存在相同的输出记录
+            existing_output = TaskOutput.query.filter_by(
+                task_id=task_id,
+                name=os.path.basename(local_path)
+            ).first()
+            
+            if existing_output:
+                # 更新现有记录
+                existing_output.file_url = file_url
+                existing_output.local_path = local_path
+                existing_output.file_type = file_type
+                existing_output.file_size = file_size
+                existing_output.thumbnail_path = thumbnail_path
+                existing_output.created_at = datetime.now()
+                task_output = existing_output
+            else:
+                # 创建新记录
+                task_output = TaskOutput(
+                    task_id=task_id,
+                    node_id='',  # 默认空值，可以后续更新
+                    name=os.path.basename(local_path),
+                    file_url=file_url,
+                    local_path=local_path,
+                    thumbnail_path=thumbnail_path,
+                    file_type=file_type,
+                    file_size=file_size
+                )
+                db.session.add(task_output)
+            
+            db.session.commit()
+            
+            current_app.logger.info(f"Successfully saved file: {local_path}")
+            return task_output
+            
+        except Exception as e:
+            current_app.logger.error(f"Error saving output file {file_name}: {e}")
+            db.session.rollback()
+            return None
+    
+    def _generate_thumbnail_for_file(self, image_path, task_id, size=(270, 480)):
+        """为单个文件生成缩略图"""
+        try:
+            with Image.open(image_path) as img:
+                # 转换为RGB模式（处理RGBA等格式）
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # 创建缩略图
+                img.thumbnail(size, Image.Resampling.LANCZOS)
+                
+                # 生成缩略图路径
+                thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', task_id)
+                os.makedirs(thumbnail_dir, exist_ok=True)
+                
+                filename = os.path.basename(image_path)
+                name, ext = os.path.splitext(filename)
+                thumbnail_path = os.path.join(thumbnail_dir, f"{name}_thumb.jpg")
+                
+                # 保存缩略图
+                img.save(thumbnail_path, 'JPEG', quality=85, optimize=True)
+                
+                return thumbnail_path
+                
+        except Exception as e:
+            current_app.logger.error(f"Error generating thumbnail for {image_path}: {e}")
+            return None
+    
     def cleanup_old_files(self, days=30):
-        """清理旧文件（可选功能）"""
+        """清理旧文件"""
         # TODO: 实现文件清理逻辑
         pass

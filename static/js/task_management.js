@@ -187,7 +187,7 @@ class TaskManager {
         
         // 批量启动：所有选中任务都可以启动
         const canBatchStart = selectedTasks.length > 0 && 
-            selectedTasks.every(task => ['READY', 'FAILED', 'STOPPED'].includes(task.status));
+            selectedTasks.every(task => ['READY', 'FAILED', 'STOPPED', 'CANCELLED'].includes(task.status));
         startBtn.disabled = !canBatchStart;
         
         // 批量停止：所有选中任务都可以停止
@@ -359,7 +359,12 @@ class TaskManager {
             </div>
             
             <div class="task-detail-section">
-                <h4>输出结果</h4>
+                <div class="section-header">
+                    <h4>输出结果</h4>
+                    <button id="refresh-files-btn" class="btn btn-sm btn-outline-primary" onclick="taskManager.refreshTaskFiles('${task.task_id}')">
+                        <i class="fas fa-sync-alt"></i> 更新文件
+                    </button>
+                </div>
                 <div id="modal-result-preview" class="result-gallery modal-results">
                     <div class="loading-results">加载结果中...</div>
                 </div>
@@ -381,6 +386,19 @@ class TaskManager {
                 .task-detail-section h4 {
                     margin-bottom: 10px;
                     color: #333;
+                }
+                .section-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 10px;
+                }
+                .section-header h4 {
+                    margin: 0;
+                }
+                #refresh-files-btn {
+                    font-size: 12px;
+                    padding: 4px 8px;
                 }
                 .detail-grid {
                     display: grid;
@@ -417,40 +435,112 @@ class TaskManager {
                 }
                 .modal-results {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                    gap: 10px;
-                    max-height: 300px;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 15px;
+                    max-height: 400px;
                     overflow-y: auto;
                 }
-                .modal-result-card {
-                    border: 1px solid #dee2e6;
-                    border-radius: 4px;
+                .result-card {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
                     overflow: hidden;
                     background: white;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: transform 0.2s, box-shadow 0.2s;
                 }
-                .modal-result-preview {
+                .result-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+                }
+                .image-preview, .video-preview, .file-preview {
+                    position: relative;
+                    height: 150px;
+                    overflow: hidden;
+                }
+                .image-preview img, .video-preview video {
                     width: 100%;
-                    height: 100px;
+                    height: 100%;
                     object-fit: cover;
                     cursor: pointer;
                 }
-                .modal-result-info {
-                    padding: 8px;
-                    font-size: 12px;
-                }
-                .modal-result-actions {
-                    padding: 8px;
-                    border-top: 1px solid #dee2e6;
+                .image-overlay, .video-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.5);
                     display: flex;
-                    gap: 5px;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    transition: opacity 0.2s;
                 }
-                .modal-result-actions a {
-                    font-size: 11px;
-                    padding: 2px 6px;
+                .image-preview:hover .image-overlay,
+                .video-preview:hover .video-overlay {
+                    opacity: 1;
+                }
+                .btn-preview, .btn-play {
+                    background: rgba(255,255,255,0.9);
+                    border: none;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                .file-preview {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    background: #f8f9fa;
+                    color: #666;
+                }
+                .file-icon {
+                    font-size: 48px;
+                    margin-bottom: 8px;
+                }
+                .file-name {
+                    font-weight: bold;
+                    font-size: 14px;
+                }
+                .card-info {
+                    padding: 12px;
+                }
+                .card-title {
+                    font-weight: bold;
+                    margin-bottom: 8px;
+                    color: #333;
+                }
+                .card-meta {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 12px;
+                    color: #666;
+                    margin-bottom: 10px;
+                }
+                .card-actions {
+                    display: flex;
+                    gap: 8px;
+                }
+                .btn {
+                    padding: 6px 12px;
                     text-decoration: none;
-                    border-radius: 2px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    text-align: center;
+                    flex: 1;
+                }
+                .btn-download {
                     background: #007bff;
                     color: white;
+                }
+                .btn-external {
+                    background: #28a745;
+                    color: white;
+                }
+                .btn:hover {
+                    opacity: 0.8;
                 }
                 .log-entry {
                     margin-bottom: 4px;
@@ -508,6 +598,8 @@ class TaskManager {
                     container.innerHTML = '<div class="no-results">暂无输出结果</div>';
                 } else {
                     container.innerHTML = outputs.map(output => this.createModalResultCard(output)).join('');
+                    // 设置画廊监听器
+                    this.setupModalGalleryListeners();
                 }
             } else {
                 document.getElementById('modal-result-preview').innerHTML = '<div class="error-results">加载结果失败</div>';
@@ -519,33 +611,67 @@ class TaskManager {
     }
     
     createModalResultCard(output) {
-        // 从文件名或URL推断文件类型
-        const fileName = output.name || 'output.file';
-        const fileUrl = output.url;
-        const fileExtension = fileName.split('.').pop().toLowerCase();
-        
-        const isImage = fileExtension.match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
-        const isVideo = fileExtension.match(/^(mp4|avi|mov|wmv|flv)$/);
+        const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
+        const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv)$/);
         
         let previewContent = '';
         
         if (isImage) {
-            previewContent = `<img src="${fileUrl}" alt="输出图片" class="modal-result-preview" style="max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 4px;"/>`;
+            const thumbnailUrl = output.thumbnail_url || output.static_url;
+            previewContent = `
+                <div class="image-preview">
+                    <img src="${thumbnailUrl}" alt="输出图片" loading="lazy" onclick="openImageModal('${output.static_url}')">
+                    <div class="image-overlay">
+                        <button class="btn-preview" onclick="openImageModal('${output.static_url}')">
+                            🔍 预览
+                        </button>
+                    </div>
+                </div>
+            `;
         } else if (isVideo) {
-            previewContent = `<video class="modal-result-preview" controls style="max-width: 200px; max-height: 150px; border-radius: 4px;"><source src="${fileUrl}" type="video/${fileExtension}"></video>`;
+            previewContent = `
+                <div class="video-preview">
+                    <video poster="${output.thumbnail_url || ''}" onclick="this.play()">
+                        <source src="${output.static_url}" type="video/${output.file_type}">
+                    </video>
+                    <div class="video-overlay">
+                        <button class="btn-play">
+                            ▶️
+                        </button>
+                    </div>
+                </div>
+            `;
         } else {
-            previewContent = `<div class="modal-result-preview" style="display: flex; align-items: center; justify-content: center; background: #f8f9fa; color: #666; width: 200px; height: 150px; border-radius: 4px;">${fileExtension.toUpperCase()}</div>`;
+            previewContent = `
+                <div class="file-preview">
+                    <div class="file-icon">
+                        📄
+                    </div>
+                    <div class="file-name">${output.file_type ? output.file_type.toUpperCase() : 'FILE'}</div>
+                </div>
+            `;
         }
         
+        const fileSize = this.formatFileSize(output.file_size);
+        const createdTime = output.created_at ? new Date(output.created_at).toLocaleString() : '未知时间';
+        
         return `
-            <div class="modal-result-card" style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px; display: inline-block; text-align: center;">
+            <div class="result-card" data-file-type="${output.file_type || 'unknown'}">
                 ${previewContent}
-                <div class="modal-result-info" style="margin-top: 8px;">
-                    <div style="font-weight: bold; margin-bottom: 4px;">${fileName}</div>
-                </div>
-                <div class="modal-result-actions" style="margin-top: 8px;">
-                    <a href="${fileUrl}" download="${fileName}" style="margin-right: 8px; padding: 4px 8px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">下载</a>
-                    <a href="${fileUrl}" target="_blank" style="padding: 4px 8px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">查看</a>
+                <div class="card-info">
+                    <div class="card-title">节点 ${output.node_id || 'unknown'}</div>
+                    <div class="card-meta">
+                        <span class="file-size">${fileSize}</span>
+                        <span class="created-time">${createdTime}</span>
+                    </div>
+                    <div class="card-actions">
+                        <a href="${output.static_url || output.url}" download class="btn btn-download">
+                            ⬇️ 下载
+                        </a>
+                        <a href="${output.file_url || output.url}" target="_blank" class="btn btn-external">
+                            🔗 原始链接
+                        </a>
+                    </div>
                 </div>
             </div>
         `;
@@ -557,6 +683,98 @@ class TaskManager {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(1024));
         return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    setupModalGalleryListeners() {
+        // 为视频添加播放控制
+        document.querySelectorAll('.video-preview video').forEach(video => {
+            video.addEventListener('click', function() {
+                if (this.paused) {
+                    this.play();
+                } else {
+                    this.pause();
+                }
+            });
+        });
+    }
+    
+    openImageModal(imageSrc, imageTitle) {
+        // 创建模态框HTML
+        const modalHtml = `
+            <div class="modal fade" id="imageModal" tabindex="-1" role="dialog">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${imageTitle}</h5>
+                            <button type="button" class="close" data-dismiss="modal">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <img src="${imageSrc}" class="img-fluid" alt="${imageTitle}">
+                        </div>
+                        <div class="modal-footer">
+                            <a href="${imageSrc}" download class="btn btn-primary">下载图片</a>
+                            <a href="${imageSrc}" target="_blank" class="btn btn-secondary">原始链接</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 移除已存在的图片模态框
+        const existingModal = document.getElementById('imageModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // 添加新的模态框到页面
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // 显示模态框
+        $('#imageModal').modal('show');
+        
+        // 模态框关闭后移除DOM元素
+        $('#imageModal').on('hidden.bs.modal', function() {
+            this.remove();
+        });
+    }
+    
+    async refreshTaskFiles(taskId) {
+        const refreshBtn = document.getElementById('refresh-files-btn');
+        const originalText = refreshBtn.innerHTML;
+        
+        try {
+            // 显示加载状态
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
+            refreshBtn.disabled = true;
+            
+            // 调用后端API更新文件
+            const response = await fetch(`/api/tasks/${taskId}/refresh-files`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                this.showSuccess(`成功更新 ${result.updated_count || 0} 个文件`);
+                
+                // 重新加载输出结果
+                this.loadModalResults(taskId);
+            } else {
+                const error = await response.json();
+                this.showError(error.message || '更新文件失败');
+            }
+        } catch (error) {
+            console.error('更新文件失败:', error);
+            this.showError('更新文件失败: ' + error.message);
+        } finally {
+            // 恢复按钮状态
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+        }
     }
     
     // 批量操作相关方法
