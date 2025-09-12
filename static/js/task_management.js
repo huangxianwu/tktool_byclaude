@@ -476,7 +476,7 @@ class TaskManager {
                     container.innerHTML = '<div class="no-logs">暂无执行日志</div>';
                 } else {
                     container.innerHTML = logs.map(log => {
-                        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                        const timestamp = new Date(log.created_at).toLocaleTimeString();
                         return `
                             <div class="log-entry">
                                 <span class="log-timestamp">[${timestamp}]</span>
@@ -519,32 +519,33 @@ class TaskManager {
     }
     
     createModalResultCard(output) {
-        const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
-        const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv)$/);
+        // 从文件名或URL推断文件类型
+        const fileName = output.name || 'output.file';
+        const fileUrl = output.url;
+        const fileExtension = fileName.split('.').pop().toLowerCase();
+        
+        const isImage = fileExtension.match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
+        const isVideo = fileExtension.match(/^(mp4|avi|mov|wmv|flv)$/);
         
         let previewContent = '';
         
         if (isImage) {
-            const thumbnailUrl = output.thumbnail_url || output.static_url;
-            previewContent = `<img src="${thumbnailUrl}" alt="输出图片" class="modal-result-preview" onclick="this.openImageModal('${output.static_url}')"/>`;
+            previewContent = `<img src="${fileUrl}" alt="输出图片" class="modal-result-preview" style="max-width: 200px; max-height: 150px; object-fit: cover; border-radius: 4px;"/>`;
         } else if (isVideo) {
-            previewContent = `<video class="modal-result-preview" poster="${output.thumbnail_url || ''}" controls><source src="${output.static_url}" type="video/${output.file_type}"></video>`;
+            previewContent = `<video class="modal-result-preview" controls style="max-width: 200px; max-height: 150px; border-radius: 4px;"><source src="${fileUrl}" type="video/${fileExtension}"></video>`;
         } else {
-            previewContent = `<div class="modal-result-preview" style="display: flex; align-items: center; justify-content: center; background: #f8f9fa; color: #666;">${output.file_type.toUpperCase()}</div>`;
+            previewContent = `<div class="modal-result-preview" style="display: flex; align-items: center; justify-content: center; background: #f8f9fa; color: #666; width: 200px; height: 150px; border-radius: 4px;">${fileExtension.toUpperCase()}</div>`;
         }
         
-        const fileSize = this.formatFileSize(output.file_size);
-        
         return `
-            <div class="modal-result-card">
+            <div class="modal-result-card" style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px; display: inline-block; text-align: center;">
                 ${previewContent}
-                <div class="modal-result-info">
-                    <div>节点 ${output.node_id}</div>
-                    <div>${fileSize}</div>
+                <div class="modal-result-info" style="margin-top: 8px;">
+                    <div style="font-weight: bold; margin-bottom: 4px;">${fileName}</div>
                 </div>
-                <div class="modal-result-actions">
-                    <a href="${output.static_url}" download>下载</a>
-                    <a href="${output.file_url}" target="_blank">查看</a>
+                <div class="modal-result-actions" style="margin-top: 8px;">
+                    <a href="${fileUrl}" download="${fileName}" style="margin-right: 8px; padding: 4px 8px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">下载</a>
+                    <a href="${fileUrl}" target="_blank" style="padding: 4px 8px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">查看</a>
                 </div>
             </div>
         `;
