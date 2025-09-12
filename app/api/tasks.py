@@ -28,7 +28,8 @@ def create_task():
     
     # 创建任务（默认状态为READY）
     is_plus = data.get('is_plus', False)  # 获取是否Plus实例标志
-    task = Task(task_id=task_id, workflow_id=data['workflow_id'], status='READY', is_plus=is_plus)
+    task_description = data.get('task_description', '')  # 获取任务描述
+    task = Task(task_id=task_id, workflow_id=data['workflow_id'], status='READY', is_plus=is_plus, task_description=task_description)
     db.session.add(task)
     
     # 处理任务数据并集成文件上传
@@ -260,5 +261,11 @@ def download_task_output(task_id, output_name):
 @bp.route('/<task_id>/logs', methods=['GET'])
 def get_task_logs(task_id):
     """获取任务执行日志"""
+    logs = task_controller.get_task_logs(task_id)
+    return jsonify(logs)
+
+@bp.route('/<task_id>/logs/history', methods=['GET'])
+def get_task_logs_history(task_id):
+    """获取任务历史日志"""
     logs = task_controller.get_task_logs(task_id)
     return jsonify(logs)

@@ -85,7 +85,7 @@ class TaskManager {
         const statusClass = `status-${task.status.toLowerCase()}`;
         const statusText = this.getStatusText(task.status);
         const createdAt = new Date(task.created_at).toLocaleString();
-        const canStart = ['READY', 'FAILED', 'STOPPED'].includes(task.status);
+        const canStart = ['READY', 'FAILED', 'STOPPED', 'CANCELLED'].includes(task.status);
         const canStop = ['PENDING', 'QUEUED', 'RUNNING'].includes(task.status);
         
         return `
@@ -98,7 +98,12 @@ class TaskManager {
                     <strong>${task.workflow_name || 'Unknown'}</strong>
                 </td>
                 <td>
-                    <code class=\"task-id\">${task.task_id.substring(0, 8)}...</code>
+                    <code class="task-id">${task.task_id.substring(0, 8)}...</code>
+                </td>
+                <td>
+                    <span class="task-description" title="${task.task_description || ''}">
+                        ${task.task_description ? (task.task_description.length > 30 ? task.task_description.substring(0, 30) + '...' : task.task_description) : '无描述'}
+                    </span>
                 </td>
                 <td>${task.node_count || 0}</td>
                 <td>
@@ -130,7 +135,8 @@ class TaskManager {
             'RUNNING': '运行中',
             'SUCCESS': '成功',
             'FAILED': '失败',
-            'STOPPED': '已停止'
+            'STOPPED': '已停止',
+            'CANCELLED': '已取消'
         };
         return statusMap[status] || status;
     }
@@ -280,35 +286,39 @@ class TaskManager {
         const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '未完成';
         
         content.innerHTML = `
-            <div class=\"task-detail-section\">
+            <div class="task-detail-section">
                 <h4>基本信息</h4>
-                <div class=\"detail-grid\">
-                    <div class=\"detail-item\">
+                <div class="detail-grid">
+                    <div class="detail-item">
                         <label>任务ID:</label>
                         <span>${task.task_id}</span>
                     </div>
-                    <div class=\"detail-item\">
+                    <div class="detail-item">
                         <label>工作流名称:</label>
                         <span>${task.workflow_name || 'Unknown'}</span>
                     </div>
-                    <div class=\"detail-item\">
-                        <label>状态:</label>
-                        <span class=\"status-badge status-${task.status.toLowerCase()}\">${this.getStatusText(task.status)}</span>
+                    <div class="detail-item">
+                        <label>任务描述:</label>
+                        <span>${task.task_description || '无描述'}</span>
                     </div>
-                    <div class=\"detail-item\">
+                    <div class="detail-item">
+                        <label>状态:</label>
+                        <span class="status-badge status-${task.status.toLowerCase()}">${this.getStatusText(task.status)}</span>
+                    </div>
+                    <div class="detail-item">
                         <label>创建时间:</label>
                         <span>${createdAt}</span>
                     </div>
-                    <div class=\"detail-item\">
+                    <div class="detail-item">
                         <label>开始时间:</label>
                         <span>${startedAt}</span>
                     </div>
-                    <div class=\"detail-item\">
+                    <div class="detail-item">
                         <label>完成时间:</label>
                         <span>${completedAt}</span>
                     </div>
                     ${task.runninghub_task_id ? `
-                    <div class=\"detail-item\">
+                    <div class="detail-item">
                         <label>RunningHub任务ID:</label>
                         <span>${task.runninghub_task_id}</span>
                     </div>
@@ -317,19 +327,48 @@ class TaskManager {
             </div>
             
             ${task.data && task.data.length > 0 ? `
-            <div class=\"task-detail-section\">
-                <h4>任务数据</h4>
-                <div class=\"task-data-list\">
-                    ${task.data.map(data => `
-                        <div class=\"task-data-item\">
-                            <strong>${data.field_name}:</strong>
-                            <span>${data.field_value}</span>
-                        </div>
-                    `).join('')}
+            <div class="task-detail-section">
+                <h4>输入参数</h4>
+                <div class="task-data-list">
+                    ${task.data.map(data => {
+                        let valueDisplay = data.field_value;
+                        // 如果是文件类型，显示预览
+                        if (data.file_url) {
+                            if (data.file_url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                                valueDisplay = `<img src="${data.file_url}" alt="输入图片" style="max-width: 200px; border-radius: 4px;">`;
+                            } else if (data.file_url.match(/\.(mp4|avi|mov)$/i)) {
+                                valueDisplay = `<video controls style="max-width: 200px;"><source src="${data.file_url}"></video>`;
+                            }
+                        }
+                        return `
+                            <div class="task-data-item">
+                                <strong>${data.field_name}:</strong>
+                                <div class="field-value">${valueDisplay}</div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
             ` : ''}
+            
+            <div class="task-detail-section">
+                <h4>执行日志</h4>
+                <div id="modal-execution-logs" class="log-stream modal-logs">
+                    <div class="loading-logs">加载日志中...</div>
+                </div>
+            </div>
+            
+            <div class="task-detail-section">
+                <h4>输出结果</h4>
+                <div id="modal-result-preview" class="result-gallery modal-results">
+                    <div class="loading-results">加载结果中...</div>
+                </div>
+            </div>
         `;
+        
+        // 加载日志和结果
+        this.loadModalLogs(task.task_id);
+        this.loadModalResults(task.task_id);
         
         // 添加样式
         if (!document.querySelector('#task-detail-styles')) {
@@ -363,9 +402,160 @@ class TaskManager {
                     background: #f8f9fa;
                     border-radius: 4px;
                 }
+                .field-value {
+                    margin-top: 4px;
+                }
+                .modal-logs {
+                    max-height: 200px;
+                    overflow-y: auto;
+                    background: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 4px;
+                    padding: 10px;
+                    font-family: monospace;
+                    font-size: 12px;
+                }
+                .modal-results {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                    gap: 10px;
+                    max-height: 300px;
+                    overflow-y: auto;
+                }
+                .modal-result-card {
+                    border: 1px solid #dee2e6;
+                    border-radius: 4px;
+                    overflow: hidden;
+                    background: white;
+                }
+                .modal-result-preview {
+                    width: 100%;
+                    height: 100px;
+                    object-fit: cover;
+                    cursor: pointer;
+                }
+                .modal-result-info {
+                    padding: 8px;
+                    font-size: 12px;
+                }
+                .modal-result-actions {
+                    padding: 8px;
+                    border-top: 1px solid #dee2e6;
+                    display: flex;
+                    gap: 5px;
+                }
+                .modal-result-actions a {
+                    font-size: 11px;
+                    padding: 2px 6px;
+                    text-decoration: none;
+                    border-radius: 2px;
+                    background: #007bff;
+                    color: white;
+                }
+                .log-entry {
+                    margin-bottom: 4px;
+                    word-wrap: break-word;
+                }
+                .log-timestamp {
+                    color: #666;
+                    margin-right: 8px;
+                }
             `;
             document.head.appendChild(styles);
         }
+    }
+    
+    async loadModalLogs(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/logs/history`);
+            if (response.ok) {
+                const logs = await response.json();
+                const container = document.getElementById('modal-execution-logs');
+                
+                if (logs.length === 0) {
+                    container.innerHTML = '<div class="no-logs">暂无执行日志</div>';
+                } else {
+                    container.innerHTML = logs.map(log => {
+                        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                        return `
+                            <div class="log-entry">
+                                <span class="log-timestamp">[${timestamp}]</span>
+                                <span class="log-message">${log.message}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    // 滚动到底部
+                    container.scrollTop = container.scrollHeight;
+                }
+            } else {
+                document.getElementById('modal-execution-logs').innerHTML = '<div class="error-logs">加载日志失败</div>';
+            }
+        } catch (error) {
+            console.error('加载日志失败:', error);
+            document.getElementById('modal-execution-logs').innerHTML = '<div class="error-logs">加载日志失败</div>';
+        }
+    }
+    
+    async loadModalResults(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/outputs`);
+            if (response.ok) {
+                const outputs = await response.json();
+                const container = document.getElementById('modal-result-preview');
+                
+                if (!outputs || outputs.length === 0) {
+                    container.innerHTML = '<div class="no-results">暂无输出结果</div>';
+                } else {
+                    container.innerHTML = outputs.map(output => this.createModalResultCard(output)).join('');
+                }
+            } else {
+                document.getElementById('modal-result-preview').innerHTML = '<div class="error-results">加载结果失败</div>';
+            }
+        } catch (error) {
+            console.error('加载结果失败:', error);
+            document.getElementById('modal-result-preview').innerHTML = '<div class="error-results">加载结果失败</div>';
+        }
+    }
+    
+    createModalResultCard(output) {
+        const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
+        const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv)$/);
+        
+        let previewContent = '';
+        
+        if (isImage) {
+            const thumbnailUrl = output.thumbnail_url || output.static_url;
+            previewContent = `<img src="${thumbnailUrl}" alt="输出图片" class="modal-result-preview" onclick="this.openImageModal('${output.static_url}')"/>`;
+        } else if (isVideo) {
+            previewContent = `<video class="modal-result-preview" poster="${output.thumbnail_url || ''}" controls><source src="${output.static_url}" type="video/${output.file_type}"></video>`;
+        } else {
+            previewContent = `<div class="modal-result-preview" style="display: flex; align-items: center; justify-content: center; background: #f8f9fa; color: #666;">${output.file_type.toUpperCase()}</div>`;
+        }
+        
+        const fileSize = this.formatFileSize(output.file_size);
+        
+        return `
+            <div class="modal-result-card">
+                ${previewContent}
+                <div class="modal-result-info">
+                    <div>节点 ${output.node_id}</div>
+                    <div>${fileSize}</div>
+                </div>
+                <div class="modal-result-actions">
+                    <a href="${output.static_url}" download>下载</a>
+                    <a href="${output.file_url}" target="_blank">查看</a>
+                </div>
+            </div>
+        `;
+    }
+    
+    formatFileSize(bytes) {
+        if (!bytes) return '未知大小';
+        
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
     }
     
     // 批量操作相关方法

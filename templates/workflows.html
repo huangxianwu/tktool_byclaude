@@ -1,9 +1,21 @@
 {% extends "base.html" %}
 
+{% block page_title %}工作流模板管理{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h2>工作流模板管理</h2>
-    <button onclick="createWorkflow()">新建工作流</button>
+    <div class="page-header-content">
+        <div class="page-info">
+            <h2>工作流模板管理</h2>
+            <p class="page-description">创建和管理您的自动化工作流模板</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="createWorkflow()">
+                <i class="fas fa-plus"></i>
+                新建工作流
+            </button>
+        </div>
+    </div>
 </div>
 
 <div class="workflow-list" id="workflowList">
@@ -47,19 +59,96 @@ async function loadWorkflows() {
         const workflows = await response.json();
         
         const container = document.getElementById('workflowList');
-        container.innerHTML = workflows.map(wf => `
-            <div class="workflow-item">
-                <h3>${wf.name}</h3>
-                <p>ID: ${wf.workflow_id}</p>
-                <p>创建时间: ${new Date(wf.created_at).toLocaleString()}</p>
-                <p>节点数量: ${wf.nodes.length}</p>
-                <div class="actions">
-                    <button onclick="editWorkflow('${wf.workflow_id}')">编辑</button>
-                    <button onclick="deleteWorkflow('${wf.workflow_id}')">删除</button>
-                    <button onclick="createTask('${wf.workflow_id}')">创建任务</button>
+        
+        if (!workflows || workflows.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h3>暂无工作流</h3>
+                    <p>创建您的第一个工作流模板开始自动化之旅</p>
+                    <button class="btn btn-primary" onclick="createWorkflow()">
+                        <i class="fas fa-plus"></i>
+                        新建工作流
+                    </button>
                 </div>
-            </div>
-        `).join('');
+            `;
+            return;
+        }
+        
+        container.innerHTML = workflows.map(wf => {
+            const nodeCount = wf.nodes ? wf.nodes.length : 0;
+            const createdDate = new Date(wf.created_at).toLocaleDateString('zh-CN');
+            const workflowId = wf.workflow_id || wf.id;
+            
+            return `
+                <div class="workflow-card" data-workflow-id="${workflowId}">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <div class="card-status">
+                            <span class="status-badge status-active">
+                                <i class="fas fa-circle"></i>
+                                活跃
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="card-title" title="${wf.name}">${wf.name}</h3>
+                        <div class="card-id">
+                            <i class="fas fa-fingerprint"></i>
+                            <span>${workflowId.slice(0, 8)}...</span>
+                        </div>
+                        <div class="card-description">
+                            <p>包含 ${nodeCount} 个处理节点的自动化工作流</p>
+                        </div>
+                        <div class="card-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-alt"></i>
+                                <span>创建于 ${createdDate}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-sitemap"></i>
+                                <span>${nodeCount} 个节点</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="card-actions">
+                            <button class="btn btn-sm btn-primary" onclick="createTask('${workflowId}')" title="创建新任务">
+                                <i class="fas fa-play"></i>
+                                <span>运行</span>
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="editWorkflow('${workflowId}')" title="编辑工作流">
+                                <i class="fas fa-edit"></i>
+                                <span>编辑</span>
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline" onclick="toggleDropdown(this)" title="更多操作">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu">
+                                    <a href="#" onclick="duplicateWorkflow('${workflowId}')">
+                                        <i class="fas fa-copy"></i>
+                                        复制
+                                    </a>
+                                    <a href="#" onclick="exportWorkflow('${workflowId}')">
+                                        <i class="fas fa-download"></i>
+                                        导出
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <a href="#" onclick="deleteWorkflow('${workflowId}')" class="text-danger">
+                                        <i class="fas fa-trash"></i>
+                                        删除
+                                    </a>
+                                </div>
+                         </div>
+                     </div>
+                 </div>
+             `;
+         }).join('');
     } catch (error) {
         console.error('加载工作流失败:', error);
     }
@@ -189,6 +278,83 @@ async function deleteWorkflow(workflowId) {
 function createTask(workflowId) {
     window.location.href = `/tasks/create/${workflowId}`;
 }
+
+// 切换下拉菜单
+function toggleDropdown(button) {
+    const dropdown = button.parentElement;
+    const menu = dropdown.querySelector('.dropdown-menu');
+    
+    // 关闭其他打开的下拉菜单
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => {
+        if (m !== menu) {
+            m.classList.remove('show');
+        }
+    });
+    
+    menu.classList.toggle('show');
+}
+
+// 复制工作流
+async function duplicateWorkflow(workflowId) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}`);
+        const workflow = await response.json();
+        
+        // 创建副本
+        const duplicatedWorkflow = {
+            name: workflow.name + ' (副本)',
+            nodes: workflow.nodes
+        };
+        
+        const createResponse = await fetch('/api/workflows', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(duplicatedWorkflow)
+        });
+        
+        if (createResponse.ok) {
+            alert('工作流复制成功');
+            loadWorkflows();
+        } else {
+            alert('复制失败');
+        }
+    } catch (error) {
+        console.error('复制工作流失败:', error);
+        alert('复制失败');
+    }
+}
+
+// 导出工作流
+async function exportWorkflow(workflowId) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}`);
+        const workflow = await response.json();
+        
+        const dataStr = JSON.stringify(workflow, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `workflow_${workflow.name}_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        URL.revokeObjectURL(link.href);
+    } catch (error) {
+        console.error('导出工作流失败:', error);
+        alert('导出失败');
+    }
+}
+
+// 点击外部关闭下拉菜单
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    }
+});
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', loadWorkflows);

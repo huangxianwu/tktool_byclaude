@@ -1,12 +1,796 @@
 {% extends "base.html" %}
 
+{% block page_title %}任务管理{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h2>任务管理</h2>
+    <div class="page-header-content">
+        <div class="page-info">
+            <h2>任务管理</h2>
+            <p class="page-description">监控和管理您的工作流任务执行状态</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-secondary" onclick="loadTasks()">
+                <i class="fas fa-sync-alt"></i>
+                刷新
+            </button>
+        </div>
+    </div>
 </div>
 
 <div class="task-list" id="taskList">
     <!-- 任务列表将通过JS动态加载 -->
+</div>
+
+<style>
+.task-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #007bff;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.card-icon {
+    color: #007bff;
+    font-size: 1.2em;
+}
+
+.card-status {
+    flex-shrink: 0;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-running {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-ready {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.card-body {
+    margin-bottom: 15px;
+}
+
+.card-title {
+    margin: 0 0 8px 0;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.card-id {
+    font-family: monospace;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 10px;
+    display: inline-block;
+}
+
+.card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.meta-item i {
+    width: 16px;
+    color: #999;
+}
+
+.card-footer {
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8em;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #1e7e34;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+}
+
+/* 任务详情弹窗样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 2% auto;
+    padding: 0;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    animation: slideIn 0.3s;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #333;
+}
+
+.close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.close:hover {
+    color: #333;
+    background: #e9ecef;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: calc(90vh - 140px);
+    overflow-y: auto;
+}
+
+.modal-footer {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* 任务详情内容样式 */
+.detail-section {
+    margin-bottom: 25px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+}
+
+.detail-section h4 {
+    background: #e9ecef;
+    padding: 12px 15px;
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 1em;
+}
+
+.detail-grid {
+    padding: 15px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    background: white;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-item label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.detail-item span {
+    color: #6c757d;
+    word-break: break-all;
+}
+
+/* 输入数据样式 */
+.input-data-list {
+    padding: 15px;
+    background: white;
+}
+
+.input-data-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.input-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.input-value {
+    color: #6c757d;
+    word-break: break-all;
+}
+
+.input-preview-image {
+    max-width: 200px;
+    max-height: 150px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.input-preview-video {
+    max-width: 300px;
+    max-height: 200px;
+    border-radius: 4px;
+}
+
+/* 日志样式 */
+.log-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 0 15px;
+}
+
+.log-container {
+    background: #1e1e1e;
+    color: #f8f8f2;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #444;
+    margin: 0 15px 15px 15px;
+}
+
+.log-entry {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+.log-time {
+    color: #6272a4;
+    margin-right: 8px;
+}
+
+.log-message {
+    color: #f8f8f2;
+}
+
+.log-info .log-message {
+    color: #8be9fd;
+}
+
+.log-warning .log-message {
+    color: #f1fa8c;
+}
+
+.log-error .log-message {
+    color: #ff5555;
+}
+
+.log-success .log-message {
+    color: #50fa7b;
+}
+
+.json-log {
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 5px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border-left: 3px solid #6272a4;
+    overflow-x: auto;
+}
+
+/* 结果文件样式 */
+.result-gallery {
+    padding: 15px;
+    background: white;
+}
+
+.result-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+}
+
+.result-preview {
+    flex-shrink: 0;
+    position: relative;
+}
+
+.result-image {
+    max-width: 120px;
+    max-height: 80px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.result-image:hover {
+    transform: scale(1.05);
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 4px;
+}
+
+.result-preview:hover .image-overlay {
+    opacity: 1;
+}
+
+.btn-preview {
+    background: rgba(255,255,255,0.9);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    color: #333;
+}
+
+.result-video {
+    max-width: 200px;
+    max-height: 120px;
+    border-radius: 4px;
+}
+
+.video-preview {
+    position: relative;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.btn-play {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2em;
+    cursor: pointer;
+}
+
+.result-file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.result-file i {
+    font-size: 1.5em;
+    color: #6c757d;
+}
+
+.file-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.file-icon {
+    font-size: 2em;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.file-name {
+    font-size: 0.8em;
+    color: #495057;
+    font-weight: 600;
+}
+
+.result-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.card-info {
+    flex: 1;
+}
+
+.card-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.card-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 图片模态框样式 */
+.image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s;
+}
+
+.modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    cursor: pointer;
+}
+
+.image-modal .modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.image-modal .modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    z-index: 10;
+}
+
+.image-modal img {
+    max-width: 100%;
+    max-height: 80vh;
+    display: block;
+}
+
+.image-modal .modal-actions {
+    padding: 15px;
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.btn-download {
+    background: #007bff;
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+/* 通用样式 */
+.no-data {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px;
+}
+
+.error-message {
+    color: #dc3545;
+    text-align: center;
+    padding: 20px;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.no-tasks {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+    }
+    
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .result-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .result-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .card-actions {
+        justify-content: flex-start;
+    }
+    
+    .meta-item {
+        font-size: 0.85em;
+    }
+}
+</style>
+
+
+
+<!-- 任务详情弹窗 -->
+<div id="taskDetailModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>任务详情</h3>
+            <span class="close" onclick="closeTaskDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <!-- 基本信息 -->
+            <div class="detail-section">
+                <h4>基本信息</h4>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>任务ID:</label>
+                        <span id="detailTaskId"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>工作流:</label>
+                        <span id="detailWorkflowName"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>状态:</label>
+                        <span id="detailStatus" class="status-badge"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>创建时间:</label>
+                        <span id="detailCreatedAt"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入参数 -->
+            <div class="detail-section">
+                <h4>输入参数</h4>
+                <div id="detailInputData" class="input-data-list">
+                    <!-- 输入数据将动态加载 -->
+                </div>
+            </div>
+
+            <!-- 执行日志 -->
+            <div class="detail-section">
+                <h4>执行日志</h4>
+                <div class="log-controls">
+                    <button class="btn btn-sm btn-secondary" onclick="toggleLogExpand()">
+                        <i class="fas fa-expand-alt"></i>
+                        展开/收起
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="refreshLogs()">
+                        <i class="fas fa-sync-alt"></i>
+                        刷新日志
+                    </button>
+                </div>
+                <div id="detailLogs" class="log-container">
+                    <!-- 日志将动态加载 -->
+                </div>
+            </div>
+
+            <!-- 结果文件 -->
+            <div class="detail-section">
+                <h4>执行结果</h4>
+                <div id="detailResults" class="result-gallery">
+                    <!-- 结果文件将动态加载 -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeTaskDetailModal()">关闭</button>
+            <button id="detailRunBtn" class="btn btn-primary" onclick="runTaskFromDetail()" style="display: none;">
+                <i class="fas fa-play"></i>
+                执行任务
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -17,20 +801,66 @@ async function loadTasks() {
         const tasks = await response.json();
         
         const container = document.getElementById('taskList');
-        container.innerHTML = tasks.map(task => `
-            <div class="task-item">
-                <h3>任务 #${task.task_id.slice(0, 8)}</h3>
-                <p>工作流ID: ${task.workflow_id}</p>
-                <p>状态: <span class="status-${task.status.toLowerCase()}">${task.status}</span></p>
-                <p>创建时间: ${new Date(task.created_at).toLocaleString()}</p>
-                <div class="actions">
-                    <button onclick="viewTask('${task.task_id}')">查看详情</button>
-                    ${task.status === 'PENDING' || task.status === 'FAILED' ? 
-                        `<button onclick="runTask('${task.task_id}')">运行</button>` : ''}
-                    <button onclick="deleteTask('${task.task_id}')">删除</button>
+        container.innerHTML = tasks.map(task => {
+            const statusMap = {
+                'PENDING': { class: 'status-pending', text: '等待中', icon: 'fas fa-clock' },
+                'RUNNING': { class: 'status-running', text: '运行中', icon: 'fas fa-spinner fa-spin' },
+                'SUCCESS': { class: 'status-success', text: '成功', icon: 'fas fa-check-circle' },
+                'FAILED': { class: 'status-failed', text: '失败', icon: 'fas fa-times-circle' }
+            };
+            const status = statusMap[task.status] || { class: 'status-pending', text: task.status, icon: 'fas fa-question-circle' };
+            
+            return `
+                <div class="task-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-tasks"></i>
+                        </div>
+                        <div class="card-status">
+                            <span class="status-badge ${status.class}">
+                                <i class="${status.icon}"></i>
+                                ${status.text}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="card-title">任务 #${task.task_id.slice(0, 8)}</h3>
+                        <p class="card-id">ID: ${task.task_id}</p>
+                        <div class="card-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-project-diagram"></i>
+                                <span>工作流: ${task.workflow_id}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-calendar"></i>
+                                <span>${new Date(task.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-clock"></i>
+                                <span>${new Date(task.created_at).toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="card-actions">
+                            <button class="btn btn-sm btn-secondary" onclick="viewTask('${task.task_id}')">
+                                <i class="fas fa-eye"></i>
+                                查看详情
+                            </button>
+                            ${task.status === 'PENDING' || task.status === 'FAILED' ? 
+                                `<button class="btn btn-sm btn-success" onclick="runTask('${task.task_id}')">
+                                    <i class="fas fa-play"></i>
+                                    运行
+                                </button>` : ''}
+                            <button class="btn btn-sm btn-danger" onclick="deleteTask('${task.task_id}')">
+                                <i class="fas fa-trash"></i>
+                                删除
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('加载任务失败:', error);
     }
@@ -55,9 +885,9 @@ async function runTask(taskId) {
     }
 }
 
-// 查看任务详情
+// 查看任务详情 - 改为弹窗模式
 function viewTask(taskId) {
-    window.location.href = `/tasks/${taskId}`;
+    showTaskDetailModal(taskId);
 }
 
 // 删除任务
@@ -80,6 +910,494 @@ async function deleteTask(taskId) {
         }
     }
 }
+
+// 任务详情弹窗相关变量
+let currentTaskId = null;
+let logExpanded = false;
+let logRefreshInterval = null;
+let eventSource = null;
+
+// 显示任务详情弹窗
+async function showTaskDetailModal(taskId) {
+    currentTaskId = taskId;
+    
+    try {
+        // 获取任务详情
+        const response = await fetch(`/api/tasks/${taskId}`);
+        const task = await response.json();
+        
+        // 填充基本信息
+        document.getElementById('detailTaskId').textContent = task.task_id.slice(0, 8) + '...';
+        document.getElementById('detailWorkflowName').textContent = task.workflow_name || 'Unknown';
+        
+        const statusElement = document.getElementById('detailStatus');
+        const statusMap = {
+            'PENDING': { class: 'status-pending', text: '等待中' },
+            'RUNNING': { class: 'status-running', text: '运行中' },
+            'SUCCESS': { class: 'status-success', text: '成功' },
+            'FAILED': { class: 'status-failed', text: '失败' },
+            'READY': { class: 'status-ready', text: '就绪' }
+        };
+        const status = statusMap[task.status] || { class: 'status-pending', text: task.status };
+        statusElement.className = `status-badge ${status.class}`;
+        statusElement.textContent = status.text;
+        
+        document.getElementById('detailCreatedAt').textContent = new Date(task.created_at).toLocaleString();
+        
+        // 显示执行按钮（如果任务可执行）
+        const runBtn = document.getElementById('detailRunBtn');
+        if (task.status === 'READY' || task.status === 'FAILED') {
+            runBtn.style.display = 'inline-block';
+        } else {
+            runBtn.style.display = 'none';
+        }
+        
+        // 加载输入数据
+        loadInputData(task.data || []);
+        
+        // 加载执行日志
+        loadTaskLogs();
+        
+        // 加载结果文件
+        loadTaskResults();
+        
+        // 显示弹窗
+        document.getElementById('taskDetailModal').style.display = 'block';
+        
+        // 开始定时刷新日志（如果任务正在运行）
+        if (task.status === 'RUNNING' || task.status === 'PENDING') {
+            startLogRefresh();
+        }
+        
+    } catch (error) {
+        console.error('加载任务详情失败:', error);
+        alert('加载任务详情失败');
+    }
+}
+
+// 关闭任务详情弹窗
+function closeTaskDetailModal() {
+    document.getElementById('taskDetailModal').style.display = 'none';
+    currentTaskId = null;
+    stopLogRefresh();
+    // 关闭SSE连接
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
+}
+
+// 加载输入数据
+function loadInputData(data) {
+    const container = document.getElementById('detailInputData');
+    
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p class="no-data">暂无输入数据</p>';
+        return;
+    }
+    
+    container.innerHTML = data.map(item => {
+        let valueDisplay = item.field_value;
+        
+        // 处理长文本
+        if (typeof valueDisplay === 'string' && valueDisplay.length > 100) {
+            valueDisplay = valueDisplay.substring(0, 100) + '...';
+        }
+        
+        // 处理文件类型
+        if (item.field_value && typeof item.field_value === 'string') {
+            if (item.field_value.startsWith('http') && item.field_value.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                valueDisplay = `<img src="${item.field_value}" alt="输入图片" class="input-preview-image">`;
+            } else if (item.field_value.startsWith('http') && item.field_value.match(/\.(mp4|avi|mov)$/i)) {
+                valueDisplay = `<video controls class="input-preview-video"><source src="${item.field_value}"></video>`;
+            }
+        }
+        
+        return `
+            <div class="input-data-item">
+                <div class="input-label">${item.field_name}:</div>
+                <div class="input-value">${valueDisplay}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 加载任务日志
+async function loadTaskLogs() {
+    if (!currentTaskId) return;
+    
+    try {
+        // 先加载历史日志
+        await loadHistoryLogs();
+        
+        // 启动实时日志流
+        startLogStream();
+        
+    } catch (error) {
+        console.error('加载日志失败:', error);
+        document.getElementById('detailLogs').innerHTML = '<p class="error-message">加载日志失败</p>';
+    }
+}
+
+// 加载历史日志
+async function loadHistoryLogs() {
+    try {
+        const response = await fetch(`/api/tasks/${currentTaskId}/logs/history`);
+        const logs = await response.json();
+        
+        const container = document.getElementById('detailLogs');
+        container.innerHTML = ''; // 清空现有日志
+        
+        if (!logs || logs.length === 0) {
+            container.innerHTML = '<p class="no-data">暂无执行日志</p>';
+            return;
+        }
+        
+        logs.forEach(log => {
+            addLogEntry({
+                message: log.message,
+                timestamp: log.timestamp,
+                level: log.level
+            });
+        });
+        
+    } catch (error) {
+        console.error('加载历史日志失败:', error);
+        // 回退到原有的日志加载方式
+        const response = await fetch(`/api/tasks/${currentTaskId}/logs/history`);
+        const logs = await response.json();
+        
+        const container = document.getElementById('detailLogs');
+        if (!logs || logs.length === 0) {
+            container.innerHTML = '<p class="no-data">暂无执行日志</p>';
+            return;
+        }
+        
+        container.innerHTML = logs.map(log => {
+            const timestamp = new Date(log.timestamp).toLocaleTimeString();
+            const levelClass = log.level ? `log-${log.level.toLowerCase()}` : 'log-info';
+            
+            return `
+                <div class="log-entry ${levelClass}">
+                    <span class="log-time">[${timestamp}]</span>
+                    <span class="log-message">${log.message}</span>
+                </div>
+            `;
+        }).join('');
+        
+        // 滚动到底部
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+// 启动日志流
+function startLogStream() {
+    // 关闭现有连接
+    if (eventSource) {
+        eventSource.close();
+    }
+    
+    // 启动SSE连接
+    eventSource = new EventSource(`/api/tasks/${currentTaskId}/logs`);
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const log = JSON.parse(event.data);
+            addLogEntry({
+                message: log.message,
+                timestamp: log.timestamp,
+                level: log.level
+            });
+        } catch (error) {
+            console.error('解析日志数据失败:', error);
+        }
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('SSE连接错误:', error);
+        // 连接错误时回退到轮询模式
+        eventSource.close();
+        setTimeout(() => {
+            startLogRefresh();
+        }, 1000);
+    };
+}
+
+// 添加日志条目
+function addLogEntry(log) {
+    const logsContainer = document.getElementById('detailLogs');
+    
+    const logEntry = document.createElement('div');
+    const logClass = log.level ? `log-${log.level.toLowerCase()}` : 'log-info';
+    logEntry.className = `log-entry ${logClass}`;
+    
+    const timestamp = document.createElement('span');
+    timestamp.className = 'log-time';
+    timestamp.textContent = `[${new Date(log.timestamp).toLocaleTimeString()}]`;
+    
+    const message = document.createElement('span');
+    message.className = 'log-message';
+    
+    // 检查是否是JSON格式的消息
+    if (log.message.trim().startsWith('{') || log.message.includes('"nodeInfoList"')) {
+        const pre = document.createElement('pre');
+        pre.className = 'json-log';
+        pre.textContent = log.message;
+        message.appendChild(pre);
+    } else {
+        message.textContent = log.message;
+    }
+    
+    logEntry.appendChild(timestamp);
+    logEntry.appendChild(message);
+    logsContainer.appendChild(logEntry);
+    
+    // 自动滚动到底部
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+}
+
+// 加载任务结果
+async function loadTaskResults() {
+    if (!currentTaskId) return;
+    
+    try {
+        const response = await fetch(`/api/tasks/${currentTaskId}/outputs`);
+        const outputs = await response.json();
+        
+        const container = document.getElementById('detailResults');
+        
+        if (!outputs || outputs.length === 0) {
+            container.innerHTML = '<p class="no-data">暂无执行结果</p>';
+            return;
+        }
+        
+        container.innerHTML = outputs.map(output => createResultCard(output)).join('');
+        
+        // 添加事件监听器
+        setupGalleryListeners();
+        
+    } catch (error) {
+        console.error('加载结果失败:', error);
+        document.getElementById('detailResults').innerHTML = '<p class="error-message">加载结果失败</p>';
+    }
+}
+
+// 创建结果卡片
+function createResultCard(output) {
+    const fileName = output.file_name || output.fileName || 'unknown';
+    const fileUrl = output.file_url || output.fileUrl || output.static_url;
+    const fileType = output.file_type || fileName.split('.').pop().toLowerCase();
+    const isImage = fileType && fileType.match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
+    const isVideo = fileType && fileType.match(/^(mp4|avi|mov|wmv|flv)$/);
+    
+    let previewContent = '';
+    
+    if (isImage) {
+        const thumbnailUrl = output.thumbnail_url || fileUrl;
+        previewContent = `
+            <div class="result-preview">
+                <img src="${thumbnailUrl}" alt="结果图片" class="result-image" onclick="openImageModal('${fileUrl}')">
+                <div class="image-overlay">
+                    <button class="btn-preview" onclick="openImageModal('${fileUrl}')">
+                        <i class="fas fa-search-plus"></i> 预览
+                    </button>
+                </div>
+            </div>
+        `;
+    } else if (isVideo) {
+        previewContent = `
+            <div class="result-preview">
+                <video controls class="result-video">
+                    <source src="${fileUrl}" type="video/${fileType}">
+                </video>
+            </div>
+        `;
+    } else {
+        previewContent = `
+            <div class="result-file">
+                <i class="fas fa-file"></i>
+                <span>${fileName}</span>
+            </div>
+        `;
+    }
+    
+    const fileSize = formatFileSize(output.file_size);
+    const createdTime = output.created_at ? new Date(output.created_at).toLocaleString() : '';
+    
+    return `
+        <div class="result-item" data-file-type="${fileType}">
+            ${previewContent}
+            <div class="result-actions">
+                <button class="btn btn-sm btn-primary" onclick="openFileInNewTab('${fileUrl}')">
+                    <i class="fas fa-external-link-alt"></i>
+                    查看
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="downloadFile('${fileUrl}', '${fileName}')">
+                    <i class="fas fa-download"></i>
+                    下载
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (!bytes) return '未知大小';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 设置图片库事件监听器
+function setupGalleryListeners() {
+    // 图片预览点击事件
+    document.querySelectorAll('.result-image').forEach(img => {
+        img.addEventListener('click', function() {
+            openImageModal(this.src);
+        });
+    });
+}
+
+// 打开图片模态框
+function openImageModal(imageUrl) {
+    // 创建模态框
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="closeImageModal()"></div>
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeImageModal()">&times;</button>
+            <img src="${imageUrl}" alt="预览图片">
+            <div class="modal-actions">
+                <a href="${imageUrl}" download class="btn btn-download">下载图片</a>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    
+    // 添加键盘支持
+    document.addEventListener('keydown', handleModalKeydown);
+}
+
+// 关闭图片模态框
+function closeImageModal() {
+    const modal = document.querySelector('.image-modal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', handleModalKeydown);
+    }
+}
+
+// 模态框键盘处理
+function handleModalKeydown(event) {
+    if (event.key === 'Escape') {
+        closeImageModal();
+    }
+}
+
+// 切换日志展开/收起
+function toggleLogExpand() {
+    const container = document.getElementById('detailLogs');
+    logExpanded = !logExpanded;
+    
+    if (logExpanded) {
+        container.style.maxHeight = 'none';
+        container.style.height = '400px';
+    } else {
+        container.style.maxHeight = '200px';
+        container.style.height = '200px';
+    }
+}
+
+// 刷新日志
+function refreshLogs() {
+    if (currentTaskId) {
+        loadHistoryLogs();
+    }
+}
+
+// 开始日志自动刷新
+function startLogRefresh() {
+    if (logRefreshInterval) {
+        clearInterval(logRefreshInterval);
+    }
+    logRefreshInterval = setInterval(() => {
+        loadTaskLogs();
+    }, 3000); // 每3秒刷新一次
+}
+
+// 停止日志自动刷新
+function stopLogRefresh() {
+    if (logRefreshInterval) {
+        clearInterval(logRefreshInterval);
+        logRefreshInterval = null;
+    }
+    // 关闭SSE连接
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
+}
+
+// 从详情页执行任务
+async function runTaskFromDetail() {
+    if (!currentTaskId) return;
+    
+    try {
+        const response = await fetch(`/api/tasks/${currentTaskId}/start`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('任务已开始执行');
+            // 重新加载详情
+            showTaskDetailModal(currentTaskId);
+            // 刷新任务列表
+            loadTasks();
+        } else {
+            alert('启动任务失败');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('启动任务失败');
+    }
+}
+
+// 下载文件
+function downloadFile(fileUrl, fileName) {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 在新标签页打开文件
+function openFileInNewTab(fileUrl) {
+    window.open(fileUrl, '_blank');
+}
+
+// 点击弹窗外部关闭
+window.onclick = function(event) {
+    const modal = document.getElementById('taskDetailModal');
+    if (event.target === modal) {
+        closeTaskDetailModal();
+    }
+}
+
+// 页面卸载时关闭SSE连接
+window.addEventListener('beforeunload', () => {
+    if (eventSource) {
+        eventSource.close();
+    }
+});
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', loadTasks);

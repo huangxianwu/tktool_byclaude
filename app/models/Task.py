@@ -8,6 +8,7 @@ class Task(db.Model):
     workflow_id = db.Column(db.String(50), db.ForeignKey('workflows.workflow_id'), nullable=False)
     status = db.Column(db.String(20), default='READY')  # READY, PENDING, QUEUED, RUNNING, SUCCESS, FAILED, STOPPED
     runninghub_task_id = db.Column(db.String(50))
+    task_description = db.Column(db.Text)  # 任务描述
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     timeout_at = db.Column(db.DateTime)  # 超时时间
     started_at = db.Column(db.DateTime)  # 开始执行时间
@@ -25,6 +26,7 @@ class Task(db.Model):
             'workflow_id': self.workflow_id,
             'status': self.status,
             'runninghub_task_id': self.runninghub_task_id,
+            'task_description': self.task_description,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'timeout_at': self.timeout_at.isoformat() if self.timeout_at else None,
             'started_at': self.started_at.isoformat() if self.started_at else None,

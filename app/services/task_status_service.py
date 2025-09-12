@@ -18,20 +18,45 @@ class TaskStatusService:
         self.runninghub_service = RunningHubService()
         self.is_monitoring = False
         self.monitor_thread = None
+        self.app = None
     
     def update_task_status(self, task_id):
         """更新单个任务的状态"""
+        from app.models.TaskLog import TaskLog
+        
         task = Task.query.get(task_id)
         if not task or not task.runninghub_task_id:
             return False
         
+        # 记录状态检查开始
+        check_log = TaskLog(
+            task_id=task_id,
+            message=f"🔍 检查任务状态 (远程ID: {task.runninghub_task_id})"
+        )
+        db.session.add(check_log)
+        db.session.commit()
+        
         try:
             # 从RunningHub获取任务状态
+            api_log = TaskLog(
+                task_id=task_id,
+                message="📡 从RunningHub获取任务状态"
+            )
+            db.session.add(api_log)
+            db.session.commit()
+            
             status_info = self.runninghub_service.get_task_status(task.runninghub_task_id)
             
             if status_info:
                 old_status = task.status
                 new_status = self.map_runninghub_status(status_info.get('status', ''))
+                
+                status_log = TaskLog(
+                    task_id=task_id,
+                    message=f"📊 获取到状态信息: {status_info.get('status', 'unknown')} -> {new_status}"
+                )
+                db.session.add(status_log)
+                db.session.commit()
                 
                 # 更新任务状态
                 if new_status and new_status != old_status:
@@ -42,17 +67,52 @@ class TaskStatusService:
                         task.completed_at = datetime.utcnow()
                     
                     db.session.commit()
+                    
+                    update_log = TaskLog(
+                        task_id=task_id,
+                        message=f"🔄 任务状态已更新: {old_status} -> {new_status}"
+                    )
+                    db.session.add(update_log)
+                    db.session.commit()
+                    
                     logger.info(f"Task {task_id} status updated from {old_status} to {new_status}")
                     
                     # 如果任务完成，尝试启动队列中的下一个任务
                     if new_status in ['SUCCESS', 'FAILED']:
+                        complete_log = TaskLog(
+                            task_id=task_id,
+                            message=f"🏁 任务已完成，触发队列处理"
+                        )
+                        db.session.add(complete_log)
+                        db.session.commit()
+                        
                         from app.services.task_queue_service import TaskQueueService
                         queue_service = TaskQueueService()
                         queue_service.process_queue()
+                else:
+                    no_change_log = TaskLog(
+                        task_id=task_id,
+                        message=f"ℹ️ 状态无变化，保持: {old_status}"
+                    )
+                    db.session.add(no_change_log)
+                    db.session.commit()
                 
                 return True
+            else:
+                error_log = TaskLog(
+                    task_id=task_id,
+                    message="❌ 未能获取到有效的状态信息"
+                )
+                db.session.add(error_log)
+                db.session.commit()
             
         except Exception as e:
+            exception_log = TaskLog(
+                task_id=task_id,
+                message=f"❌ 更新任务状态时发生异常: {str(e)}"
+            )
+            db.session.add(exception_log)
+            db.session.commit()
             logger.error(f"Error updating task status for {task_id}: {e}")
         
         return False
@@ -120,6 +180,10 @@ class TaskStatusService:
             logger.warning("Task monitoring is already running")
             return
         
+        if not self.app:
+            logger.error("Cannot start monitoring: app instance not set")
+            return
+        
         self.is_monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
@@ -136,19 +200,29 @@ class TaskStatusService:
         """监控循环"""
         while self.is_monitoring:
             try:
-                # 更新所有运行中的任务状态
-                self.update_all_running_tasks()
-                
-                # 检查超时任务
-                from app.services.task_queue_service import TaskQueueService
-                queue_service = TaskQueueService()
-                timeout_count = queue_service.check_timeout_tasks()
-                
-                if timeout_count > 0:
-                    logger.warning(f"Found {timeout_count} timeout tasks")
-                
-                # 等待下一次检查
-                time.sleep(current_app.config.get('STATUS_CHECK_INTERVAL', 10))
+                if self.app:
+                    with self.app.app_context():
+                        # 更新所有运行中的任务状态
+                        self.update_all_running_tasks()
+                        
+                        # 检查超时任务 - 但不自动触发队列处理
+                        from app.services.task_queue_service import TaskQueueService
+                        queue_service = TaskQueueService()
+                        timeout_count = queue_service.check_timeout_tasks_without_queue_processing()
+                        
+                        if timeout_count > 0:
+                            logger.warning(f"Found {timeout_count} timeout tasks, processing queue...")
+                            # 只有在实际处理了超时任务时才触发队列处理
+                            queue_service.process_queue()
+                        
+                        # 检查并处理PENDING状态的任务
+                        self._process_pending_tasks(queue_service)
+                        
+                        # 等待下一次检查
+                        time.sleep(self.app.config.get('STATUS_CHECK_INTERVAL', 10))
+                else:
+                    # 如果没有应用实例，使用默认间隔
+                    time.sleep(10)
                 
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
@@ -166,6 +240,19 @@ class TaskStatusService:
         except Exception as e:
             logger.error(f"Error getting task progress for {task_id}: {e}")
             return None
+    
+    def _process_pending_tasks(self, queue_service):
+        """处理PENDING状态的任务"""
+        try:
+            # 查询所有PENDING状态的任务
+            pending_tasks = Task.query.filter_by(status='PENDING').order_by(Task.created_at.asc()).all()
+            
+            if pending_tasks:
+                logger.info(f"Found {len(pending_tasks)} pending tasks, processing queue...")
+                # 触发队列处理
+                queue_service.process_queue()
+        except Exception as e:
+            logger.error(f"Error processing pending tasks: {e}")
     
     def get_task_outputs(self, task_id):
         """获取任务输出文件"""

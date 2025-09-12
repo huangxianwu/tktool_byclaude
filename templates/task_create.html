@@ -10,6 +10,15 @@
         <!-- 表单字段将通过JS动态生成 -->
     </div>
     
+    <!-- 任务描述 -->
+    <div class="form-group">
+        <label for="taskDescription">任务描述:</label>
+        <textarea id="taskDescription" name="task_description" 
+                  placeholder="请输入任务描述，用于在任务列表中区分不同任务" 
+                  rows="3" maxlength="500"></textarea>
+        <small class="form-text text-muted">可选字段，最多500字符，用于任务管理和识别</small>
+    </div>
+    
     <!-- Plus实例选择 -->
     <div class="form-group">
         <label>
@@ -177,6 +186,9 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
         // 获取Plus选择状态
         const isPlusChecked = document.getElementById('isPlusCheckbox').checked;
         
+        // 获取任务描述
+        const taskDescription = document.getElementById('taskDescription').value.trim();
+        
         // 创建任务（后端将自动处理文件上传）
         const response = await fetch('/api/tasks', {
             method: 'POST',
@@ -186,7 +198,8 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
             body: JSON.stringify({
                 workflow_id: workflowId,
                 data: taskData,
-                is_plus: isPlusChecked
+                is_plus: isPlusChecked,
+                task_description: taskDescription
             })
         });
         
