@@ -2,7 +2,7 @@
 任务状态监控服务
 负责监控RunningHub任务状态并更新本地数据库
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app
 from app import db
 from app.models.Task import Task
@@ -61,6 +61,11 @@ class TaskStatusService:
                 # 更新任务状态
                 if new_status and new_status != old_status:
                     task.status = new_status
+                    
+                    # 如果任务状态变更为RUNNING，设置超时时间
+                    if new_status == 'RUNNING' and hasattr(task, 'timeout_at'):
+                        timeout_minutes = current_app.config.get('TASK_TIMEOUT_MINUTES', 30)
+                        task.timeout_at = datetime.utcnow() + timedelta(minutes=timeout_minutes)
                     
                     # 如果任务完成，记录完成时间
                     if new_status in ['SUCCESS', 'FAILED']:
@@ -242,15 +247,29 @@ class TaskStatusService:
             return None
     
     def _process_pending_tasks(self, queue_service):
-        """处理PENDING状态的任务"""
+        """处理PENDING状态的任务 - 只有当RunningHub任务数为0时才处理队列"""
         try:
             # 查询所有PENDING状态的任务
             pending_tasks = Task.query.filter_by(status='PENDING').order_by(Task.created_at.asc()).all()
             
             if pending_tasks:
-                logger.info(f"Found {len(pending_tasks)} pending tasks, processing queue...")
-                # 触发队列处理
-                queue_service.process_queue()
+                # 检查RunningHub中是否有正在运行的任务
+                current_tasks = self.runninghub_service.check_account_status()
+                
+                if current_tasks is None:
+                    # 无法获取RunningHub状态时，使用本地数据库检查
+                    running_count = Task.query.filter(Task.status.in_(['QUEUED', 'RUNNING'])).count()
+                    can_process = running_count == 0
+                else:
+                    # 只有当RunningHub中没有任务时才处理队列
+                    can_process = current_tasks == 0
+                
+                if can_process:
+                    logger.info(f"Found {len(pending_tasks)} pending tasks and RunningHub is idle, processing queue...")
+                    # 触发队列处理
+                    queue_service.process_queue()
+                else:
+                    logger.debug(f"Found {len(pending_tasks)} pending tasks but RunningHub has {current_tasks} running tasks, waiting...")
         except Exception as e:
             logger.error(f"Error processing pending tasks: {e}")
     

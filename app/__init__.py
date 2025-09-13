@@ -50,7 +50,8 @@ def create_app(config_class=Config):
     
     # 在应用上下文中启动后台任务检查
     def start_background_tasks():
-        with app.app_context():
+        """启动后台任务"""
+        try:
             # 导入服务
             from app.services.task_queue_service import task_queue_service
             from app.services.monitoring_service import monitoring_service
@@ -63,50 +64,65 @@ def create_app(config_class=Config):
             
             # 启动任务状态监控服务
             task_status_service = TaskStatusService()
-            task_status_service.app = app  # 传递应用实例
+            task_status_service.app = app
             task_status_service.start_monitoring()
             
-            # 启动后台任务检查
-            def background_task_checker():
-                """后台任务检查器 - 定期检查超时任务和处理队列"""
-                while True:
-                    try:
-                        with app.app_context():
-                            # 检查超时任务
-                            task_queue_service.check_timeout_tasks()
+        except Exception as e:
+            print(f"Failed to start background tasks: {e}")
+        
+        def background_task_checker():
+            """后台任务检查器 - 定期检查超时任务和处理队列"""
+            while True:
+                try:
+                    with app.app_context():
+                        # 检查超时任务
+                        task_queue_service.check_timeout_tasks()
+                        
+                        # 处理队列
+                        task_queue_service.process_queue()
+                        
+                        # 广播系统状态更新
+                        status_monitor.broadcast_system_status()
+                        
+                        # 运行健康检查和告警（每5分钟运行一次）
+                        current_time = time.time()
+                        if not hasattr(background_task_checker, 'last_health_check'):
+                            background_task_checker.last_health_check = 0
                             
-                            # 处理队列
-                            task_queue_service.process_queue()
-                            
-                            # 广播系统状态更新
-                            status_monitor.broadcast_system_status()
-                            
-                            # 运行健康检查和告警（每5分钟运行一次）
-                            current_time = time.time()
-                            if not hasattr(background_task_checker, 'last_health_check'):
-                                background_task_checker.last_health_check = 0
-                                
-                            if current_time - background_task_checker.last_health_check >= 300:  # 5分钟
-                                monitoring_service.load_config()
-                                health_status = monitoring_service.run_health_check_and_alert()
-                                # 广播健康状态
-                                status_monitor.broadcast_health_status(health_status)
-                                background_task_checker.last_health_check = current_time
-                            
-                            # 等待30秒
-                            time.sleep(30)
-                            
-                    except Exception as e:
-                        print(f"Background task checker error: {e}")
-                        # 出错时等待更长时间
-                        time.sleep(60)
-            
-            # 启动后台线程
-            background_thread = threading.Thread(target=background_task_checker, daemon=True)
-            background_thread.start()
+                        if current_time - background_task_checker.last_health_check >= 300:  # 5分钟
+                            monitoring_service.load_config()
+                            health_status = monitoring_service.run_health_check_and_alert()
+                            # 广播健康状态
+                            status_monitor.broadcast_health_status(health_status)
+                            background_task_checker.last_health_check = current_time
+                        
+                        # 等待30秒
+                        time.sleep(30)
+                        
+                except Exception as e:
+                    print(f"Background task checker error: {e}")
+                    # 出错时等待更长时间
+                    time.sleep(60)
+        
+        # 启动后台线程
+        background_thread = threading.Thread(target=background_task_checker, daemon=True)
+        background_thread.start()
     
     # 延迟启动后台任务
     threading.Timer(2.0, start_background_tasks).start()
+    
+    # 延迟执行系统故障恢复
+    def delayed_recovery():
+        with app.app_context():
+            try:
+                from app.services.recovery_service import recovery_service
+                print("🔄 Starting system recovery...")
+                recovery_stats = recovery_service.perform_recovery(delay_seconds=3)
+                print(f"✅ System recovery completed: {recovery_stats}")
+            except Exception as e:
+                print(f"❌ System recovery failed: {e}")
+    
+    threading.Timer(5.0, delayed_recovery).start()
     
     return app
 

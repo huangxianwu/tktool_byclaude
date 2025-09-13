@@ -66,7 +66,7 @@ class TaskManager {
     }
     
     renderTasks() {
-        const tbody = document.getElementById('task-list');
+        const tbody = document.getElementById('taskTableBody');
         const emptyState = document.getElementById('empty-state');
         
         if (!this.tasks || this.tasks.length === 0) {
@@ -95,25 +95,30 @@ class TaskManager {
                            onchange=\"taskManager.toggleTaskSelection('${task.task_id}')\">
                 </td>
                 <td>
-                    <strong>${task.workflow_name || 'Unknown'}</strong>
+                    <code class="task-id" ondblclick="copyToClipboard('${task.task_id}')" title="双击复制完整ID">${task.task_id.substring(0, 8)}...</code>
                 </td>
-                <td>
-                    <code class="task-id">${task.task_id.substring(0, 8)}...</code>
-                </td>
-                <td>
+                <td class="task-description-cell">
                     <span class="task-description" title="${task.task_description || ''}">
-                        ${task.task_description ? (task.task_description.length > 30 ? task.task_description.substring(0, 30) + '...' : task.task_description) : '无描述'}
+                        ${task.task_description || '无描述'}
                     </span>
                 </td>
-                <td>${task.node_count || 0}</td>
-                <td>
-                    <span class=\"plus-badge ${task.is_plus ? 'plus-yes' : 'plus-no'}\">${task.is_plus ? '是' : '否'}</span>
+                <td class="workflow-name-cell" title="${task.workflow_name || 'Unknown'}">
+                    ${task.workflow_name || 'Unknown'}
                 </td>
                 <td>
-                    <span class=\"status-badge ${statusClass}\">${statusText}</span>
+                    <code class="task-id" ondblclick="copyToClipboard('${task.runninghub_task_id || ''}')" title="双击复制完整ID">${task.runninghub_task_id || '未分配'}</code>
+                </td>
+                <td style="padding: 0 8px;">
+                    ${task.is_plus ? '<span class="plus-badge">PLUS</span>' : '否'}
                 </td>
                 <td>
-                    <span class=\"datetime\">${createdAt}</span>
+                    <span class="datetime">${createdAt}</span>
+                </td>
+                <td>
+                    <span class="duration">${this.calculateDuration(task)}</span>
+                </td>
+                <td>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
                 </td>
                 <td>
                     <div class=\"task-actions\">
@@ -139,6 +144,27 @@ class TaskManager {
             'CANCELLED': '已取消'
         };
         return statusMap[status] || status;
+    }
+
+    calculateDuration(task) {
+        if (!task.started_at) {
+            return '-';
+        }
+        
+        const startTime = new Date(task.started_at);
+        const endTime = task.completed_at ? new Date(task.completed_at) : new Date();
+        const duration = endTime - startTime;
+        
+        if (duration < 0) {
+            return '-';
+        }
+        
+        const totalSeconds = Math.floor(duration / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
     
     toggleTaskSelection(taskId) {
@@ -263,6 +289,47 @@ class TaskManager {
         }
     }
     
+    async updateTaskStatus(taskId) {
+        try {
+            console.log('开始更新任务状态:', taskId);
+            const task = this.tasks.find(t => t.task_id === taskId);
+            if (!task || !task.runninghub_task_id) {
+                this.showError('任务不存在或缺少远程任务ID');
+                return;
+            }
+            
+            console.log('发送更新请求，远程任务ID:', task.runninghub_task_id);
+            const response = await fetch(`/api/tasks/${taskId}/update-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    remote_task_id: task.runninghub_task_id
+                })
+            });
+            
+            console.log('响应状态码:', response.status);
+            const result = await response.json();
+            console.log('响应结果:', result);
+            
+            if (response.ok) {
+                if (result.success) {
+                    this.showSuccess(`状态更新成功: ${result.old_status} → ${result.new_status}`);
+                } else {
+                    this.showSuccess(result.message || '状态更新完成');
+                }
+                this.loadTasks();
+                this.loadQueueStatus();
+            } else {
+                this.showError(result.error || '更新失败');
+            }
+        } catch (error) {
+            console.error('更新任务状态异常:', error);
+            this.showError('更新任务状态失败: ' + error.message);
+        }
+    }
+    
     async showTaskDetail(taskId) {
         try {
             const response = await fetch(`/api/tasks/${taskId}`);
@@ -272,7 +339,8 @@ class TaskManager {
             
             const task = await response.json();
             this.renderTaskDetail(task);
-            document.getElementById('task-detail-modal').style.display = 'block';
+            const drawer = document.getElementById('taskDrawer');
+            drawer.classList.add('open');
             
         } catch (error) {
             this.showError('获取任务详情失败: ' + error.message);
@@ -280,7 +348,7 @@ class TaskManager {
     }
     
     renderTaskDetail(task) {
-        const content = document.getElementById('task-detail-content');
+        const content = document.getElementById('drawerContent');
         const createdAt = new Date(task.created_at).toLocaleString();
         const startedAt = task.started_at ? new Date(task.started_at).toLocaleString() : '未开始';
         const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '未完成';
@@ -304,6 +372,7 @@ class TaskManager {
                     <div class="detail-item">
                         <label>状态:</label>
                         <span class="status-badge status-${task.status.toLowerCase()}">${this.getStatusText(task.status)}</span>
+                        ${task.runninghub_task_id && ['FAILED', 'RUNNING', 'QUEUED', 'PENDING'].includes(task.status) ? `<button class="btn btn-info btn-sm" onclick="taskManager.updateTaskStatus('${task.task_id}')" style="margin-left: 10px;">更新状态</button>` : ''}
                     </div>
                     <div class="detail-item">
                         <label>创建时间:</label>
@@ -859,7 +928,12 @@ class TaskManager {
     }
     
     closeTaskDetail() {
-        document.getElementById('task-detail-modal').style.display = 'none';
+        const drawer = document.getElementById('taskDrawer');
+        drawer.classList.remove('open');
+    }
+    
+    closeTaskDrawer() {
+        this.closeTaskDetail();
     }
     
     // 工具方法
@@ -1007,6 +1081,19 @@ function closeBatchConfirm() {
 
 function closeTaskDetail() {
     taskManager.closeTaskDetail();
+}
+
+function closeTaskDrawer() {
+    taskManager.closeTaskDrawer();
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        taskManager.showSuccess('ID已复制到剪贴板');
+    }).catch(err => {
+        console.error('复制失败:', err);
+        taskManager.showError('复制失败');
+    });
 }
 
 // 点击模态框外部关闭

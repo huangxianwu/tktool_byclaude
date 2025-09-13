@@ -194,6 +194,43 @@ class TaskController:
         """下载任务输出文件"""
         return self.status_service.download_task_output(task_id, output_name)
     
+    def download_task_files(self, task_id):
+        """下载任务的所有输出文件到本地"""
+        from app.services.file_manager import FileManager
+        from app.services.runninghub import RunningHubService
+        from app.models.Task import Task
+        
+        # 检查任务是否存在
+        task = Task.query.get(task_id)
+        if not task:
+            return {'success': False, 'error': '任务不存在'}
+        
+        if not task.runninghub_task_id:
+            return {'success': False, 'error': '任务没有远程ID，无法下载文件'}
+        
+        try:
+            # 从RunningHub获取输出文件
+            runninghub_service = RunningHubService()
+            outputs = runninghub_service.get_outputs(task.runninghub_task_id, task_id)
+            
+            if not outputs:
+                return {'success': False, 'error': '未找到输出文件'}
+            
+            # 下载并保存文件
+            file_manager = FileManager()
+            saved_files = file_manager.download_and_save_outputs(task_id, outputs)
+            
+            return {
+                'success': True,
+                'message': f'成功下载 {len(saved_files)} 个文件',
+                'files': saved_files,
+                'total_count': len(saved_files)
+            }
+            
+        except Exception as e:
+            logger.error(f"下载任务文件失败 {task_id}: {e}")
+            return {'success': False, 'error': f'下载失败: {str(e)}'}
+    
     def validate_batch_operation(self, task_ids, operation):
         """验证批量操作的有效性"""
         if not task_ids:

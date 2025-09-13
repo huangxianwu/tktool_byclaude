@@ -97,7 +97,7 @@ async function renderResults(data) {
     
     // 获取任务的输出文件
     try {
-        const response = await fetch(`/api/tasks/${taskId}/outputs`);
+        const response = await fetch(`/api/tasks/${taskId}/outputs?t=${Date.now()}`);
         const outputs = await response.json();
         
         if (!outputs || outputs.length === 0) {
@@ -163,11 +163,22 @@ function createResultCard(output) {
     const fileSize = formatFileSize(output.file_size);
     const createdTime = new Date(output.created_at).toLocaleString();
     
+    // 文件来源标识
+    const sourceLabel = output.source === 'local' ? '本地文件' : '远程文件';
+    const sourceClass = output.source === 'local' ? 'source-local' : 'source-remote';
+    const sourceIcon = output.source === 'local' ? '💾' : '☁️';
+    
     return `
-        <div class="result-card" data-file-type="${output.file_type}">
+        <div class="result-card" data-file-type="${output.file_type}" data-source="${output.source || 'unknown'}">
             ${previewContent}
             <div class="card-info">
-                <div class="card-title">节点 ${output.node_id}</div>
+                <div class="card-header">
+                    <div class="card-title">${output.name || output.file_name || output.fileName || 'unknown'}</div>
+                    <div class="file-source ${sourceClass}">
+                        <span class="source-icon">${sourceIcon}</span>
+                        <span class="source-text">${sourceLabel}</span>
+                    </div>
+                </div>
                 <div class="card-meta">
                     <span class="file-size">${fileSize}</span>
                     <span class="created-time">${createdTime}</span>
@@ -176,8 +187,8 @@ function createResultCard(output) {
                     <a href="${output.static_url}" download class="btn btn-download">
                         <i class="icon-download"></i> 下载
                     </a>
-                    <a href="${output.file_url}" target="_blank" class="btn btn-external">
-                        <i class="icon-external"></i> 原始链接
+                    <a href="${output.static_url}" target="_blank" class="btn btn-external">
+                        <i class="icon-external"></i> 查看文件
                     </a>
                 </div>
             </div>

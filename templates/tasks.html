@@ -18,34 +18,212 @@
     </div>
 </div>
 
-<div class="task-list" id="taskList">
-    <!-- 任务列表将通过JS动态加载 -->
+<!-- 任务表格 -->
+<div class="table-container">
+    <table class="task-table" id="taskTable">
+        <thead>
+            <tr>
+                <th width="50"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                <th width="120">本地任务ID</th>
+                <th>任务描述</th>
+                <th width="80">节点数</th>
+                <th width="100">PLUS加速</th>
+                <th>工作流名</th>
+                <th width="120">远程任务ID</th>
+                <th width="150">创建时间</th>
+                <th width="200">操作</th>
+            </tr>
+        </thead>
+        <tbody id="taskTableBody">
+            <!-- 任务列表将通过JS动态加载 -->
+        </tbody>
+    </table>
 </div>
 
 <style>
-.task-card {
+/* 表格样式 */
+.table-container {
     background: white;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border-left: 4px solid #007bff;
+    overflow: hidden;
 }
 
-.card-header {
+.task-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.task-table th {
+    background: #f8f9fa;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    font-size: 0.9em;
+}
+
+.task-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.task-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.task-id {
+    font-family: monospace;
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+.task-description {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plus-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+.plus-enabled {
+    background: #d4edda;
+    color: #155724;
+}
+
+.plus-disabled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.workflow-name {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remote-task-id {
+    font-family: monospace;
+    font-size: 0.8em;
+    color: #6c757d;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.action-buttons .btn {
+    padding: 4px 8px;
+    font-size: 0.8em;
+}
+
+/* 侧拉窗样式 */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    right: -600px;
+    width: 600px;
+    height: 100%;
+    background: white;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+    transition: right 0.3s ease;
+    z-index: 1001;
+    overflow-y: auto;
+}
+
+.sidebar.active {
+    right: 0;
+}
+
+.sidebar-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-.card-icon {
-    color: #007bff;
-    font-size: 1.2em;
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #333;
 }
 
-.card-status {
-    flex-shrink: 0;
+.sidebar-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.sidebar-close:hover {
+    color: #333;
+    background: #e9ecef;
+}
+
+.sidebar-body {
+    padding: 20px;
+}
+
+.sidebar-footer {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    position: sticky;
+    bottom: 0;
+}
+
+/* 状态更新按钮 */
+.status-update-btn {
+    margin-left: 10px;
+    padding: 4px 8px;
+    font-size: 0.8em;
 }
 
 .status-badge {
@@ -718,14 +896,14 @@
 
 
 
-<!-- 任务详情弹窗 -->
-<div id="taskDetailModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
+<!-- 任务详情侧拉窗 -->
+<div id="taskDetailSidebar" class="sidebar-overlay">
+    <div class="sidebar">
+        <div class="sidebar-header">
             <h3>任务详情</h3>
-            <span class="close" onclick="closeTaskDetailModal()">&times;</span>
+            <button class="sidebar-close" onclick="closeTaskDetailSidebar()">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="sidebar-body">
             <!-- 基本信息 -->
             <div class="detail-section">
                 <h4>基本信息</h4>
@@ -740,7 +918,13 @@
                     </div>
                     <div class="detail-item">
                         <label>状态:</label>
-                        <span id="detailStatus" class="status-badge"></span>
+                        <span>
+                            <span id="detailStatus" class="status-badge"></span>
+                            <button id="statusUpdateBtn" class="btn btn-sm btn-warning status-update-btn" onclick="updateTaskStatus()" style="display: none;">
+                                <i class="fas fa-sync-alt"></i>
+                                更新状态
+                            </button>
+                        </span>
                     </div>
                     <div class="detail-item">
                         <label>创建时间:</label>
@@ -777,14 +961,20 @@
 
             <!-- 结果文件 -->
             <div class="detail-section">
-                <h4>执行结果</h4>
-                <div id="detailResults" class="result-gallery">
-                    <!-- 结果文件将动态加载 -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>执行结果</h4>
+                    <button id="downloadAllFilesBtn" class="btn btn-sm btn-success" onclick="downloadAllFiles()" style="display: none;">
+                        <i class="fas fa-download"></i>
+                        下载所有文件
+                    </button>
                 </div>
+                <div id="detailResults" class="result-gallery">
+                <!-- 结果文件将动态加载 -->
+            </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeTaskDetailModal()">关闭</button>
+        <div class="sidebar-footer">
+            <button class="btn btn-secondary" onclick="closeTaskDetailSidebar()">关闭</button>
             <button id="detailRunBtn" class="btn btn-primary" onclick="runTaskFromDetail()" style="display: none;">
                 <i class="fas fa-play"></i>
                 执行任务
@@ -800,52 +990,44 @@ async function loadTasks() {
         const response = await fetch('/api/tasks');
         const tasks = await response.json();
         
-        const container = document.getElementById('taskList');
-        container.innerHTML = tasks.map(task => {
+        const tbody = document.getElementById('taskTableBody');
+        tbody.innerHTML = tasks.map(task => {
             const statusMap = {
-                'PENDING': { class: 'status-pending', text: '等待中', icon: 'fas fa-clock' },
-                'RUNNING': { class: 'status-running', text: '运行中', icon: 'fas fa-spinner fa-spin' },
-                'SUCCESS': { class: 'status-success', text: '成功', icon: 'fas fa-check-circle' },
-                'FAILED': { class: 'status-failed', text: '失败', icon: 'fas fa-times-circle' }
+                'PENDING': { class: 'status-pending', text: '等待中' },
+                'RUNNING': { class: 'status-running', text: '运行中' },
+                'SUCCESS': { class: 'status-success', text: '成功' },
+                'FAILED': { class: 'status-failed', text: '失败' }
             };
-            const status = statusMap[task.status] || { class: 'status-pending', text: task.status, icon: 'fas fa-question-circle' };
+            const status = statusMap[task.status] || { class: 'status-pending', text: task.status };
+            
+            // 获取任务描述（从工作流名或任务数据中提取）
+            const description = task.description || task.workflow_name || '无描述';
+            
+            // 计算节点数（从任务数据中获取）
+            const nodeCount = task.data ? task.data.length : 0;
+            
+            // PLUS加速状态（这里假设从任务配置中获取，暂时设为随机）
+            const isPlusEnabled = Math.random() > 0.5;
             
             return `
-                <div class="task-card">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <i class="fas fa-tasks"></i>
-                        </div>
-                        <div class="card-status">
-                            <span class="status-badge ${status.class}">
-                                <i class="${status.icon}"></i>
-                                ${status.text}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <h3 class="card-title">任务 #${task.task_id.slice(0, 8)}</h3>
-                        <p class="card-id">ID: ${task.task_id}</p>
-                        <div class="card-meta">
-                            <div class="meta-item">
-                                <i class="fas fa-project-diagram"></i>
-                                <span>工作流: ${task.workflow_id}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-calendar"></i>
-                                <span>${new Date(task.created_at).toLocaleDateString()}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-clock"></i>
-                                <span>${new Date(task.created_at).toLocaleTimeString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <div class="card-actions">
+                <tr>
+                    <td><input type="checkbox" class="task-checkbox" value="${task.task_id}"></td>
+                    <td><span class="task-id">${task.task_id.slice(0, 8)}...</span></td>
+                    <td><span class="task-description" title="${description}">${description}</span></td>
+                    <td>${nodeCount}</td>
+                    <td>
+                        <span class="plus-badge ${isPlusEnabled ? 'plus-enabled' : 'plus-disabled'}">
+                            ${isPlusEnabled ? '已启用' : '未启用'}
+                        </span>
+                    </td>
+                    <td><span class="workflow-name" title="${task.workflow_name || '未知'}">${task.workflow_name || '未知'}</span></td>
+                    <td><span class="remote-task-id">${task.runninghub_task_id || '-'}</span></td>
+                    <td>${new Date(task.created_at).toLocaleString()}</td>
+                    <td>
+                        <div class="action-buttons">
                             <button class="btn btn-sm btn-secondary" onclick="viewTask('${task.task_id}')">
                                 <i class="fas fa-eye"></i>
-                                查看详情
+                                详情
                             </button>
                             ${task.status === 'PENDING' || task.status === 'FAILED' ? 
                                 `<button class="btn btn-sm btn-success" onclick="runTask('${task.task_id}')">
@@ -857,12 +1039,13 @@ async function loadTasks() {
                                 删除
                             </button>
                         </div>
-                    </div>
-                </div>
+                    </td>
+                </tr>
             `;
         }).join('');
     } catch (error) {
         console.error('加载任务失败:', error);
+        document.getElementById('taskTableBody').innerHTML = '<tr><td colspan="9" class="text-center">加载任务失败</td></tr>';
     }
 }
 
@@ -885,9 +1068,9 @@ async function runTask(taskId) {
     }
 }
 
-// 查看任务详情 - 改为弹窗模式
+// 查看任务详情 - 改为侧拉窗模式
 function viewTask(taskId) {
-    showTaskDetailModal(taskId);
+    showTaskDetailSidebar(taskId);
 }
 
 // 删除任务
@@ -917,8 +1100,8 @@ let logExpanded = false;
 let logRefreshInterval = null;
 let eventSource = null;
 
-// 显示任务详情弹窗
-async function showTaskDetailModal(taskId) {
+// 显示任务详情侧拉窗
+async function showTaskDetailSidebar(taskId) {
     currentTaskId = taskId;
     
     try {
@@ -961,8 +1144,9 @@ async function showTaskDetailModal(taskId) {
         // 加载结果文件
         loadTaskResults();
         
-        // 显示弹窗
-        document.getElementById('taskDetailModal').style.display = 'block';
+        // 显示侧拉窗
+        const sidebar = document.getElementById('taskDetailSidebar');
+        sidebar.classList.add('active');
         
         // 开始定时刷新日志（如果任务正在运行）
         if (task.status === 'RUNNING' || task.status === 'PENDING') {
@@ -975,9 +1159,10 @@ async function showTaskDetailModal(taskId) {
     }
 }
 
-// 关闭任务详情弹窗
-function closeTaskDetailModal() {
-    document.getElementById('taskDetailModal').style.display = 'none';
+// 关闭任务详情侧拉窗
+function closeTaskDetailSidebar() {
+    const sidebar = document.getElementById('taskDetailSidebar');
+    sidebar.classList.remove('active');
     currentTaskId = null;
     stopLogRefresh();
     // 关闭SSE连接
@@ -1161,17 +1346,22 @@ async function loadTaskResults() {
     if (!currentTaskId) return;
     
     try {
-        const response = await fetch(`/api/tasks/${currentTaskId}/outputs`);
+        const response = await fetch(`/api/tasks/${currentTaskId}/outputs?t=${Date.now()}`);
         const outputs = await response.json();
         
         const container = document.getElementById('detailResults');
+        const downloadBtn = document.getElementById('downloadAllFilesBtn');
         
         if (!outputs || outputs.length === 0) {
             container.innerHTML = '<p class="no-data">暂无执行结果</p>';
+            downloadBtn.style.display = 'none';
             return;
         }
         
         container.innerHTML = outputs.map(output => createResultCard(output)).join('');
+        
+        // 显示下载所有文件按钮
+        downloadBtn.style.display = 'inline-block';
         
         // 添加事件监听器
         setupGalleryListeners();
@@ -1179,12 +1369,13 @@ async function loadTaskResults() {
     } catch (error) {
         console.error('加载结果失败:', error);
         document.getElementById('detailResults').innerHTML = '<p class="error-message">加载结果失败</p>';
+        document.getElementById('downloadAllFilesBtn').style.display = 'none';
     }
 }
 
 // 创建结果卡片
 function createResultCard(output) {
-    const fileName = output.file_name || output.fileName || 'unknown';
+    const fileName = output.name || output.file_name || output.fileName || 'unknown';
     const fileUrl = output.file_url || output.fileUrl || output.static_url;
     const fileType = output.file_type || fileName.split('.').pop().toLowerCase();
     const isImage = fileType && fileType.match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
@@ -1224,9 +1415,22 @@ function createResultCard(output) {
     const fileSize = formatFileSize(output.file_size);
     const createdTime = output.created_at ? new Date(output.created_at).toLocaleString() : '';
     
+    // 文件来源标识
+    const sourceLabel = output.source === 'local' ? 
+        '<span class="file-source local"><i class="fas fa-hdd"></i> 本地</span>' : 
+        '<span class="file-source remote"><i class="fas fa-cloud"></i> 远程</span>';
+    
     return `
-        <div class="result-item" data-file-type="${fileType}">
+        <div class="result-item" data-file-type="${fileType}" data-source="${output.source || 'unknown'}">
             ${previewContent}
+            <div class="result-info">
+                <div class="file-meta">
+                    <span class="file-name">${fileName}</span>
+                    ${sourceLabel}
+                </div>
+                ${fileSize ? `<div class="file-size">${fileSize}</div>` : ''}
+                ${createdTime ? `<div class="file-time">${createdTime}</div>` : ''}
+            </div>
             <div class="result-actions">
                 <button class="btn btn-sm btn-primary" onclick="openFileInNewTab('${fileUrl}')">
                     <i class="fas fa-external-link-alt"></i>
@@ -1300,6 +1504,58 @@ function handleModalKeydown(event) {
     }
 }
 
+// 下载单个文件
+function downloadFile(fileUrl, fileName) {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 在新标签页打开文件
+function openFileInNewTab(fileUrl) {
+    window.open(fileUrl, '_blank');
+}
+
+// 下载所有文件
+async function downloadAllFiles() {
+    if (!currentTaskId) return;
+    
+    const downloadBtn = document.getElementById('downloadAllFilesBtn');
+    const originalText = downloadBtn.innerHTML;
+    
+    try {
+        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 下载中...';
+        downloadBtn.disabled = true;
+        
+        const response = await fetch(`/api/tasks/${currentTaskId}/download-files`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`成功下载 ${result.total_count} 个文件到本地！`);
+            // 重新加载结果以显示本地文件
+            loadTaskResults();
+        } else {
+            alert(`下载失败: ${result.error}`);
+        }
+        
+    } catch (error) {
+        console.error('下载文件失败:', error);
+        alert('下载文件失败');
+    } finally {
+        downloadBtn.innerHTML = originalText;
+        downloadBtn.disabled = false;
+    }
+}
+
 // 切换日志展开/收起
 function toggleLogExpand() {
     const container = document.getElementById('detailLogs');
@@ -1356,7 +1612,7 @@ async function runTaskFromDetail() {
         if (response.ok) {
             alert('任务已开始执行');
             // 重新加载详情
-            showTaskDetailModal(currentTaskId);
+            showTaskDetailSidebar(currentTaskId);
             // 刷新任务列表
             loadTasks();
         } else {
@@ -1384,11 +1640,58 @@ function openFileInNewTab(fileUrl) {
     window.open(fileUrl, '_blank');
 }
 
-// 点击弹窗外部关闭
+// 更新任务状态
+async function updateTaskStatus(taskId, remoteTaskId) {
+    if (!remoteTaskId) {
+        alert('该任务没有远程任务ID，无法更新状态');
+        return;
+    }
+    
+    try {
+        // 显示加载状态
+        const updateBtn = document.getElementById('updateStatusBtn');
+        const originalText = updateBtn.innerHTML;
+        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
+        updateBtn.disabled = true;
+        
+        // 调用后端API更新状态
+        const response = await fetch(`/api/tasks/${taskId}/update-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                remote_task_id: remoteTaskId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`状态更新成功：${result.old_status} → ${result.new_status}`);
+            // 重新加载任务详情
+            showTaskDetailSidebar(taskId);
+            // 刷新任务列表
+            loadTasks();
+        } else {
+            alert(`更新失败：${result.error || '未知错误'}`);
+        }
+    } catch (error) {
+        console.error('更新任务状态失败:', error);
+        alert('更新任务状态失败，请稍后重试');
+    } finally {
+        // 恢复按钮状态
+        const updateBtn = document.getElementById('updateStatusBtn');
+        updateBtn.innerHTML = originalText;
+        updateBtn.disabled = false;
+    }
+}
+
+// 点击侧拉窗遮罩关闭
 window.onclick = function(event) {
-    const modal = document.getElementById('taskDetailModal');
-    if (event.target === modal) {
-        closeTaskDetailModal();
+    const overlay = document.getElementById('taskDetailSidebar');
+    if (event.target === overlay) {
+        closeTaskDetailSidebar();
     }
 }
 
@@ -1402,4 +1705,5 @@ window.addEventListener('beforeunload', () => {
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', loadTasks);
 </script>
+
 {% endblock %}

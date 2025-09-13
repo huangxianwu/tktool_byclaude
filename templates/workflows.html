@@ -3,130 +3,186 @@
 {% block page_title %}工作流模板管理{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <div class="page-info">
-            <h2>工作流模板管理</h2>
-            <p class="page-description">创建和管理您的自动化工作流模板</p>
-        </div>
-        <div class="page-actions">
-            <button class="btn btn-primary" onclick="createWorkflow()">
-                <i class="fas fa-plus"></i>
-                新建工作流
-            </button>
+<div class="workflow-management">
+    <div class="header-section">
+        <h2>工作流模板管理</h2>
+        <div class="workflow-info">
+            <div class="workflow-stats">
+                <span class="stat-item">总工作流: <span id="total-count">0</span></span>
+                <span class="stat-item">活跃模板: <span id="active-count">0</span></span>
+            </div>
+            <div class="workflow-controls">
+                <button class="btn btn-secondary" onclick="refreshWorkflows()">🔄 刷新</button>
+                <button class="btn btn-primary" onclick="createWorkflow()">
+                    <i class="fas fa-plus"></i>
+                    新建工作流
+                </button>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="workflow-list" id="workflowList">
-    <!-- 工作流列表将通过JS动态加载 -->
+    <div class="workflow-table-container">
+        <table class="workflow-table">
+            <thead>
+                <tr>
+                    <th>工作流名称</th>
+                    <th>工作流ID</th>
+                    <th>描述</th>
+                    <th>节点数</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="workflow-list">
+                <!-- 工作流列表将通过JavaScript动态加载 -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="loading-indicator" id="loading" style="display: none;">
+        <div class="spinner">🔄</div>
+        <span>加载中...</span>
+    </div>
+
+    <div class="empty-state" id="empty-state" style="display: none;">
+        <div class="empty-icon">📋</div>
+        <h3>暂无工作流</h3>
+        <p>创建您的第一个工作流模板开始自动化之旅</p>
+        <button class="btn btn-primary" onclick="createWorkflow()">
+            <i class="fas fa-plus"></i>
+            新建工作流
+        </button>
+    </div>
 </div>
 
 <!-- 新建工作流模态框 -->
 <div id="createModal" class="modal" style="display: none;">
     <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <h3>新建工作流</h3>
-        <form id="workflowForm">
-            <div class="form-group">
-                <label>工作流ID (可选):</label>
-                <input type="text" id="workflowId" placeholder="留空自动生成">
-            </div>
-            
-            <div class="form-group">
-                <label>工作流名称:</label>
-                <input type="text" id="workflowName" required>
-            </div>
-            
-            <div class="form-group">
-                <label>节点配置:</label>
-                <div id="nodesContainer">
-                    <!-- 节点将通过JS动态添加 -->
+        <div class="modal-header">
+            <h3>新建工作流</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="workflowForm">
+                <div class="form-group">
+                    <label>工作流ID (可选):</label>
+                    <input type="text" id="workflowId" placeholder="留空自动生成">
                 </div>
-                <button type="button" onclick="addNode()">添加节点</button>
-            </div>
-            
-            <button type="submit">创建</button>
-        </form>
+                
+                <div class="form-group">
+                    <label>工作流名称:</label>
+                    <input type="text" id="workflowName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>描述 (可选):</label>
+                    <textarea id="workflowDescription" placeholder="描述这个工作流的用途"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>节点配置:</label>
+                    <div id="nodesContainer">
+                        <!-- 节点将通过JS动态添加 -->
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addNode()">添加节点</button>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 工作流详情模态框 -->
+<div class="modal" id="workflow-detail-modal">
+    <div class="modal-content workflow-detail-modal-content">
+        <div class="modal-header">
+            <h3>工作流详情</h3>
+            <span class="close" onclick="closeWorkflowDetail()">&times;</span>
+        </div>
+        <div class="modal-body workflow-detail-modal-body" id="workflow-detail-content">
+            <!-- 工作流详情内容 -->
+        </div>
     </div>
 </div>
 
 <script>
 // 加载工作流列表
 async function loadWorkflows() {
+    const loading = document.getElementById('loading');
+    const emptyState = document.getElementById('empty-state');
+    const tableContainer = document.querySelector('.workflow-table-container');
+    
+    loading.style.display = 'block';
+    emptyState.style.display = 'none';
+    tableContainer.style.display = 'none';
+    
     try {
         const response = await fetch('/api/workflows');
         const workflows = await response.json();
         
-        const container = document.getElementById('workflowList');
+        loading.style.display = 'none';
         
         if (!workflows || workflows.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-project-diagram"></i>
-                    </div>
-                    <h3>暂无工作流</h3>
-                    <p>创建您的第一个工作流模板开始自动化之旅</p>
-                    <button class="btn btn-primary" onclick="createWorkflow()">
-                        <i class="fas fa-plus"></i>
-                        新建工作流
-                    </button>
-                </div>
-            `;
+            emptyState.style.display = 'block';
             return;
         }
         
-        container.innerHTML = workflows.map(wf => {
+        tableContainer.style.display = 'block';
+        
+        const tbody = document.getElementById('workflow-list');
+        tbody.innerHTML = workflows.map(wf => {
             const nodeCount = wf.nodes ? wf.nodes.length : 0;
-            const createdDate = new Date(wf.created_at).toLocaleDateString('zh-CN');
+            const createdDate = new Date(wf.created_at).toLocaleString('zh-CN');
             const workflowId = wf.workflow_id || wf.id;
+            const description = wf.description || '包含 ' + nodeCount + ' 个处理节点的自动化工作流';
             
             return `
-                <div class="workflow-card" data-workflow-id="${workflowId}">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <i class="fas fa-project-diagram"></i>
+                <tr>
+                    <td>
+                        <div class="workflow-name">
+                            <strong>${wf.name}</strong>
                         </div>
-                        <div class="card-status">
-                            <span class="status-badge status-active">
-                                <i class="fas fa-circle"></i>
-                                活跃
-                            </span>
+                    </td>
+                    <td>
+                        <div class="workflow-id">
+                            <code>${workflowId.slice(0, 8)}...</code>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <h3 class="card-title" title="${wf.name}">${wf.name}</h3>
-                        <div class="card-id">
-                            <i class="fas fa-fingerprint"></i>
-                            <span>${workflowId.slice(0, 8)}...</span>
+                    </td>
+                    <td>
+                        <div class="workflow-description">
+                            ${description}
                         </div>
-                        <div class="card-description">
-                            <p>包含 ${nodeCount} 个处理节点的自动化工作流</p>
-                        </div>
-                        <div class="card-meta">
-                            <div class="meta-item">
-                                <i class="fas fa-calendar-alt"></i>
-                                <span>创建于 ${createdDate}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-sitemap"></i>
-                                <span>${nodeCount} 个节点</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <div class="card-actions">
-                            <button class="btn btn-sm btn-primary" onclick="createTask('${workflowId}')" title="创建新任务">
+                    </td>
+                    <td>
+                        <span class="node-count">${nodeCount}</span>
+                    </td>
+                    <td>
+                        <span class="status-badge status-active">
+                            <i class="fas fa-circle"></i>
+                            活跃
+                        </span>
+                    </td>
+                    <td>
+                        <div class="datetime">${createdDate}</div>
+                    </td>
+                    <td>
+                        <div class="workflow-actions">
+                            <button class="btn btn-primary btn-sm" onclick="createTask('${workflowId}')" title="创建新任务">
                                 <i class="fas fa-play"></i>
-                                <span>运行</span>
                             </button>
-                            <button class="btn btn-sm btn-secondary" onclick="editWorkflow('${workflowId}')" title="编辑工作流">
+                            <button class="btn btn-secondary btn-sm" onclick="editWorkflow('${workflowId}')" title="编辑工作流">
                                 <i class="fas fa-edit"></i>
-                                <span>编辑</span>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="viewWorkflowDetail('${workflowId}')" title="查看详情">
+                                <i class="fas fa-eye"></i>
                             </button>
                             <div class="dropdown">
-                                <button class="btn btn-sm btn-outline" onclick="toggleDropdown(this)" title="更多操作">
+                                <button class="btn btn-secondary btn-sm" onclick="toggleDropdown(this)" title="更多操作">
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <div class="dropdown-menu">
@@ -144,43 +200,56 @@ async function loadWorkflows() {
                                         删除
                                     </a>
                                 </div>
-                         </div>
-                     </div>
-                 </div>
-             `;
-         }).join('');
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        // 更新统计信息
+        document.getElementById('total-count').textContent = workflows.length;
+        document.getElementById('active-count').textContent = workflows.length;
+        
     } catch (error) {
         console.error('加载工作流失败:', error);
+        loading.style.display = 'none';
+        emptyState.style.display = 'block';
     }
 }
 
+// 刷新工作流列表
+function refreshWorkflows() {
+    loadWorkflows();
+}
+
 // 创建工作流
-async function createWorkflow() {
+function createWorkflow() {
     document.getElementById('createModal').style.display = 'block';
 }
 
 // 添加节点
 function addNode() {
     const container = document.getElementById('nodesContainer');
-    const nodeId = Date.now(); // 简单的时间戳作为临时ID
+    const nodeId = Date.now();
     
-    // 创建新的节点元素
     const nodeDiv = document.createElement('div');
     nodeDiv.className = 'node-item';
     
     nodeDiv.innerHTML = `
-        <input type="text" placeholder="节点ID (可选)" name="node_id">
-        <input type="text" placeholder="节点名称" name="node_name" required>
-        <select name="node_type" required>
-            <option value="text">文本</option>
-            <option value="number">数字</option>
-            <option value="image">图片</option>
-            <option value="video">视频</option>
-        </select>
-        <button type="button" onclick="this.parentElement.remove()">删除</button>
+        <div class="node-form">
+            <input type="text" placeholder="节点ID (可选)" name="node_id">
+            <input type="text" placeholder="节点名称" name="node_name" required>
+            <select name="node_type" required>
+                <option value="text">文本</option>
+                <option value="number">数字</option>
+                <option value="image">图片</option>
+                <option value="video">视频</option>
+            </select>
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.node-item').remove()">删除</button>
+        </div>
     `;
     
-    // 使用appendChild而不是innerHTML来避免清空已有内容
     container.appendChild(nodeDiv);
 }
 
@@ -188,10 +257,8 @@ function addNode() {
 document.getElementById('workflowForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const formData = new FormData(e.target);
     const nodes = [];
     
-    // 收集节点数据
     document.querySelectorAll('.node-item').forEach(node => {
         const nodeIdInput = node.querySelector('[name="node_id"]');
         const nodeData = {
@@ -199,7 +266,6 @@ document.getElementById('workflowForm').addEventListener('submit', async (e) => 
             node_type: node.querySelector('[name="node_type"]').value
         };
         
-        // 只有在用户输入了节点ID时才包含它
         if (nodeIdInput && nodeIdInput.value.trim()) {
             nodeData.node_id = nodeIdInput.value.trim();
         }
@@ -210,10 +276,10 @@ document.getElementById('workflowForm').addEventListener('submit', async (e) => 
     const workflowId = document.getElementById('workflowId').value.trim();
     const workflowData = {
         name: document.getElementById('workflowName').value,
+        description: document.getElementById('workflowDescription').value,
         nodes: nodes
     };
     
-    // 只有在用户输入了workflow ID时才包含它
     if (workflowId) {
         workflowData.workflow_id = workflowId;
     }
@@ -246,6 +312,50 @@ function closeModal() {
     document.getElementById('nodesContainer').innerHTML = '';
 }
 
+// 查看工作流详情
+async function viewWorkflowDetail(workflowId) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}`);
+        const workflow = await response.json();
+        
+        const content = document.getElementById('workflow-detail-content');
+        content.innerHTML = `
+            <div class="workflow-detail">
+                <div class="detail-section">
+                    <h4>基本信息</h4>
+                    <p><strong>名称:</strong> ${workflow.name}</p>
+                    <p><strong>ID:</strong> ${workflow.workflow_id || workflow.id}</p>
+                    <p><strong>描述:</strong> ${workflow.description || '无'}</p>
+                    <p><strong>创建时间:</strong> ${new Date(workflow.created_at).toLocaleString('zh-CN')}</p>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>节点配置 (${workflow.nodes ? workflow.nodes.length : 0} 个)</h4>
+                    <div class="nodes-list">
+                        ${workflow.nodes ? workflow.nodes.map(node => `
+                            <div class="node-detail">
+                                <strong>${node.node_name}</strong>
+                                <span class="node-type">[${node.node_type}]</span>
+                                ${node.node_id ? `<code>${node.node_id}</code>` : ''}
+                            </div>
+                        `).join('') : '<p>无节点配置</p>'}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('workflow-detail-modal').style.display = 'block';
+    } catch (error) {
+        console.error('获取工作流详情失败:', error);
+        alert('获取工作流详情失败');
+    }
+}
+
+// 关闭工作流详情
+function closeWorkflowDetail() {
+    document.getElementById('workflow-detail-modal').style.display = 'none';
+}
+
 // 编辑工作流
 function editWorkflow(workflowId) {
     window.location.href = `/workflows/edit/${workflowId}`;
@@ -264,7 +374,7 @@ async function deleteWorkflow(workflowId) {
         
         if (response.ok) {
             alert('删除成功');
-            loadWorkflows(); // 重新加载列表
+            loadWorkflows();
         } else {
             alert('删除失败');
         }
@@ -284,7 +394,6 @@ function toggleDropdown(button) {
     const dropdown = button.parentElement;
     const menu = dropdown.querySelector('.dropdown-menu');
     
-    // 关闭其他打开的下拉菜单
     document.querySelectorAll('.dropdown-menu.show').forEach(m => {
         if (m !== menu) {
             m.classList.remove('show');
@@ -300,9 +409,9 @@ async function duplicateWorkflow(workflowId) {
         const response = await fetch(`/api/workflows/${workflowId}`);
         const workflow = await response.json();
         
-        // 创建副本
         const duplicatedWorkflow = {
             name: workflow.name + ' (副本)',
+            description: workflow.description,
             nodes: workflow.nodes
         };
         
@@ -359,4 +468,380 @@ document.addEventListener('click', function(event) {
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', loadWorkflows);
 </script>
+
+<style>
+.workflow-management {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.workflow-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.workflow-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.stat-item {
+    background: #f5f5f5;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #666;
+}
+
+.workflow-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.workflow-table-container {
+    overflow-x: auto;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.workflow-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.workflow-table th {
+    background: #f5f5f5;
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+    font-weight: 600;
+}
+
+.workflow-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.workflow-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.workflow-name strong {
+    color: #333;
+    font-size: 14px;
+}
+
+.workflow-id code {
+    background: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #666;
+}
+
+.workflow-description {
+    color: #666;
+    font-size: 13px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-count {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.workflow-actions {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.btn-primary { background: #007bff; color: white; }
+.btn-primary:hover { background: #0056b3; }
+
+.btn-secondary { background: #6c757d; color: white; }
+.btn-secondary:hover { background: #5a6268; }
+
+.btn-danger { background: #dc3545; color: white; }
+.btn-danger:hover { background: #c82333; }
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.loading-indicator {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.spinner {
+    font-size: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.workflow-detail-modal-content {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #aaa;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-actions {
+    text-align: right;
+    margin-top: 20px;
+    gap: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+.node-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #f9f9f9;
+}
+
+.node-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    min-width: 120px;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-menu a {
+    display: block;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: #333;
+    font-size: 12px;
+}
+
+.dropdown-menu a:hover {
+    background: #f5f5f5;
+}
+
+.dropdown-menu .text-danger {
+    color: #dc3545 !important;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: #eee;
+    margin: 4px 0;
+}
+
+.datetime {
+    font-size: 12px;
+    color: #666;
+}
+
+.workflow-detail {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+
+.detail-section h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.nodes-list {
+    display: grid;
+    gap: 8px;
+}
+
+.node-detail {
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.node-type {
+    background: #e9ecef;
+    color: #495057;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.node-detail code {
+    background: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #666;
+}
+</style>
 {% endblock %}

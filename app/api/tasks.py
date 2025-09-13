@@ -270,6 +270,15 @@ def get_task_logs_history(task_id):
     logs = task_controller.get_task_logs_history(task_id)
     return jsonify(logs)
 
+@bp.route('/<task_id>/download-files', methods=['POST'])
+def download_task_files(task_id):
+    """下载任务输出文件到本地"""
+    try:
+        result = task_controller.download_task_files(task_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/<task_id>/refresh-files', methods=['POST'])
 def refresh_task_files(task_id):
     """刷新任务输出文件"""
@@ -285,3 +294,130 @@ def refresh_task_files(task_id):
             'success': False,
             'message': str(e)
         }), 500
+
+@bp.route('/<task_id>/sync', methods=['POST'])
+def sync_task_status(task_id):
+    """手动同步单个任务状态"""
+    try:
+        from app.services.recovery_service import recovery_service
+        
+        success = recovery_service.manual_sync_task(task_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Task status synced successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to sync task status - task not found or no remote ID'
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@bp.route('/recovery/stats', methods=['GET'])
+def get_recovery_stats():
+    """获取系统恢复统计信息"""
+    try:
+        from app.services.recovery_service import recovery_service
+        
+        stats = recovery_service.get_recovery_stats()
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@bp.route('/recovery/trigger', methods=['POST'])
+def trigger_recovery():
+    """手动触发系统恢复"""
+    try:
+        from app.services.recovery_service import recovery_service
+        from flask import current_app
+        
+        with current_app.app_context():
+            recovery_stats = recovery_service.perform_recovery(delay_seconds=0)
+            
+        return jsonify({
+            'success': True,
+            'message': 'Recovery completed successfully',
+            'stats': recovery_stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@bp.route('/<task_id>/update-status', methods=['POST'])
+def update_task_status(task_id):
+    """根据远程任务ID更新任务状态"""
+    try:
+        data = request.get_json()
+        remote_task_id = data.get('remote_task_id')
+        
+        if not remote_task_id:
+            return jsonify({'error': '缺少远程任务ID'}), 400
+        
+        # 获取本地任务
+        task = Task.query.filter_by(task_id=task_id).first()
+        if not task:
+            return jsonify({'error': '任务不存在'}), 404
+        
+        # 记录原始状态
+        old_status = task.status
+        
+        # 查询远程任务状态
+        from app.services.runninghub import RunningHubService
+        runninghub_service = RunningHubService()
+        
+        try:
+            # get_task_status返回字符串状态
+            remote_status = runninghub_service.get_status(remote_task_id, task_id)
+            
+            if not remote_status:
+                return jsonify({'error': '无法获取远程任务状态'}), 500
+            
+            # 映射远程状态到本地状态
+            status_mapping = {
+                'PENDING': 'PENDING',
+                'RUNNING': 'RUNNING', 
+                'SUCCESS': 'SUCCESS',
+                'FAILED': 'FAILED',
+                'CANCELLED': 'FAILED',
+                'queue': 'PENDING',
+                'running': 'RUNNING',
+                'success': 'SUCCESS',
+                'failed': 'FAILED',
+                'cancelled': 'FAILED'
+            }
+            
+            new_status = status_mapping.get(remote_status, 'UNKNOWN')
+            
+            # 更新本地任务状态
+            task.status = new_status
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'old_status': old_status,
+                'new_status': new_status,
+                'remote_status': remote_status
+            })
+            
+        except Exception as e:
+            return jsonify({'error': f'查询远程任务状态失败: {str(e)}'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -29,7 +29,7 @@ def download_output_file(task_id, output_id):
         return send_file(
             output.local_path,
             as_attachment=True,
-            download_name=f"output_{output.node_id}.{output.file_type}"
+            download_name=output.name
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -52,7 +52,8 @@ def download_all_outputs(task_id):
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             for output in outputs:
                 if os.path.exists(output.local_path):
-                    filename = f"node_{output.node_id}.{output.file_type}"
+                    # 使用数据库中存储的文件名
+                    filename = output.name
                     zip_file.write(output.local_path, filename)
         
         zip_buffer.seek(0)

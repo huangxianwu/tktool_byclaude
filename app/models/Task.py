@@ -19,6 +19,7 @@ class Task(db.Model):
     workflow = db.relationship('Workflow', backref='tasks', lazy=True)
     data = db.relationship('TaskData', backref='task', lazy=True, cascade='all, delete-orphan')
     logs = db.relationship('TaskLog', backref='task', lazy=True, cascade='all, delete-orphan')
+    outputs = db.relationship('TaskOutput', backref='task', lazy=True, cascade='all, delete-orphan')
     
     def to_dict(self):
         return {

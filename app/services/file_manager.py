@@ -6,8 +6,9 @@ from urllib.parse import urlparse, unquote
 from PIL import Image
 import io
 from flask import current_app
-from app.models import TaskOutput
+from app.models import TaskOutput, Task
 from app import db
+import re
 
 class FileManager:
     def __init__(self):
@@ -39,8 +40,14 @@ class FileManager:
                     current_app.logger.error(f"Failed to download {file_url}: {response.status_code}")
                     continue
                 
-                # 生成本地文件路径
-                local_path = self._generate_local_path(task_id, file_type, i, node_id)
+                # 生成原始文件名（用于生成自定义文件名）
+                original_filename = f"node_{node_id}_output_{i}.{file_type}"
+                
+                # 生成自定义文件名（传递索引确保唯一性）
+                custom_filename = self._generate_custom_filename(task_id, original_filename, i)
+                
+                # 生成本地文件路径（使用自定义文件名）
+                local_path = self._generate_local_path_with_custom_name(task_id, custom_filename, file_type)
                 
                 # 保存原始文件
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)
@@ -50,12 +57,13 @@ class FileManager:
                 # 生成缩略图（仅图片）
                 thumbnail_path = None
                 if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
-                    thumbnail_path = self._generate_thumbnail(local_path, task_id, i, node_id)
+                    thumbnail_path = self._generate_thumbnail_with_custom_name(local_path, task_id, custom_filename)
                 
-                # 保存到数据库
+                # 保存到数据库（使用自定义文件名）
                 task_output = TaskOutput(
                     task_id=task_id,
                     node_id=node_id,
+                    name=custom_filename,  # 使用自定义文件名
                     file_url=file_url,
                     local_path=local_path,
                     thumbnail_path=thumbnail_path,
@@ -84,26 +92,41 @@ class FileManager:
     def _generate_local_path(self, task_id, file_type, index, node_id):
         """生成本地文件路径"""
         now = datetime.now()
-        year_month = now.strftime('%Y/%m')
+        date_str = now.strftime('%m%d')  # 格式如：0913
         
         # 根据文件类型选择目录
         if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
-            base_dir = os.path.join(self.base_dir, 'images', year_month)
+            base_dir = os.path.join(self.base_dir, 'image', date_str)
         elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv']:
-            base_dir = os.path.join(self.base_dir, 'videos', year_month)
+            base_dir = os.path.join(self.base_dir, 'video', date_str)
         else:
-            base_dir = os.path.join(self.base_dir, 'documents', year_month)
+            base_dir = os.path.join(self.base_dir, 'document', date_str)
         
         filename = f"task_{task_id}_node_{node_id}_output_{index}.{file_type}"
         return os.path.join(base_dir, filename)
+    
+    def _generate_local_path_with_custom_name(self, task_id, custom_filename, file_type):
+        """使用自定义文件名生成本地文件路径"""
+        now = datetime.now()
+        date_str = now.strftime('%m%d')  # 格式如：0913
+        
+        # 根据文件类型选择目录
+        if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
+            base_dir = os.path.join(self.base_dir, 'image', date_str)
+        elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv']:
+            base_dir = os.path.join(self.base_dir, 'video', date_str)
+        else:
+            base_dir = os.path.join(self.base_dir, 'document', date_str)
+        
+        return os.path.join(base_dir, custom_filename)
     
     def _generate_thumbnail(self, image_path, task_id, index, node_id, size=(270, 480)):
         """生成缩略图"""
         try:
             now = datetime.now()
-            year_month = now.strftime('%Y/%m')
+            date_str = now.strftime('%m%d')  # 格式如：0913
             
-            thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', year_month)
+            thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
             os.makedirs(thumbnail_dir, exist_ok=True)
             
             thumbnail_filename = f"task_{task_id}_node_{node_id}_output_{index}_thumb.jpg"
@@ -121,33 +144,92 @@ class FileManager:
                 elif img.mode != 'RGB':
                     img = img.convert('RGB')
                 
-                # 计算9:16比例的智能裁剪
-                target_width, target_height = size  # (270, 480)
-                target_ratio = target_width / target_height  # 9:16 = 0.5625
+                # 计算缩放比例以适应目标尺寸
+                img_ratio = img.width / img.height
+                target_ratio = size[0] / size[1]
                 
-                original_width, original_height = img.size
-                original_ratio = original_width / original_height
-                
-                if original_ratio > target_ratio:
-                    # 原图更宽，需要裁剪宽度
-                    new_width = int(original_height * target_ratio)
-                    left = (original_width - new_width) // 2
-                    crop_box = (left, 0, left + new_width, original_height)
+                if img_ratio > target_ratio:
+                    # 图片更宽，以高度为准
+                    new_height = size[1]
+                    new_width = int(new_height * img_ratio)
                 else:
-                    # 原图更高，需要裁剪高度
-                    new_height = int(original_width / target_ratio)
-                    top = (original_height - new_height) // 2
-                    crop_box = (0, top, original_width, top + new_height)
+                    # 图片更高，以宽度为准
+                    new_width = size[0]
+                    new_height = int(new_width / img_ratio)
                 
-                # 裁剪并调整大小
-                cropped_img = img.crop(crop_box)
-                thumbnail = cropped_img.resize(size, Image.Resampling.LANCZOS)
-                thumbnail.save(thumbnail_path, 'JPEG', quality=85)
+                # 缩放图片
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 创建目标尺寸的画布并居中放置图片
+                canvas = Image.new('RGB', size, (255, 255, 255))
+                x = (size[0] - new_width) // 2
+                y = (size[1] - new_height) // 2
+                canvas.paste(img, (x, y))
+                
+                # 保存缩略图
+                canvas.save(thumbnail_path, 'JPEG', quality=85)
                 
             return thumbnail_path
             
         except Exception as e:
-            current_app.logger.error(f"Error generating thumbnail: {str(e)}")
+            current_app.logger.error(f"Failed to generate thumbnail for {image_path}: {str(e)}")
+            return None
+    
+    def _generate_thumbnail_with_custom_name(self, image_path, task_id, custom_filename, size=(270, 480)):
+        """使用自定义文件名生成缩略图"""
+        try:
+            now = datetime.now()
+            date_str = now.strftime('%m%d')  # 格式如：0913
+            
+            thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
+            os.makedirs(thumbnail_dir, exist_ok=True)
+            
+            # 从自定义文件名生成缩略图文件名
+            name_without_ext = os.path.splitext(custom_filename)[0]
+            thumbnail_filename = f"{name_without_ext}_thumb.jpg"
+            thumbnail_path = os.path.join(thumbnail_dir, thumbnail_filename)
+            
+            # 使用PIL生成9:16比例的缩略图
+            with Image.open(image_path) as img:
+                # 转换为RGB（处理RGBA和其他格式）
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # 计算缩放比例以适应目标尺寸
+                img_ratio = img.width / img.height
+                target_ratio = size[0] / size[1]
+                
+                if img_ratio > target_ratio:
+                    # 图片更宽，以高度为准
+                    new_height = size[1]
+                    new_width = int(new_height * img_ratio)
+                else:
+                    # 图片更高，以宽度为准
+                    new_width = size[0]
+                    new_height = int(new_width / img_ratio)
+                
+                # 缩放图片
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # 创建目标尺寸的画布并居中放置图片
+                canvas = Image.new('RGB', size, (255, 255, 255))
+                x = (size[0] - new_width) // 2
+                y = (size[1] - new_height) // 2
+                canvas.paste(img, (x, y))
+                
+                # 保存缩略图
+                canvas.save(thumbnail_path, 'JPEG', quality=85)
+                
+            return thumbnail_path
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to generate thumbnail for {image_path}: {str(e)}")
             return None
     
     def _get_static_url(self, local_path):
@@ -167,8 +249,13 @@ class FileManager:
         
         result = []
         for output in outputs:
-            # 生成文件名
-            filename = f"node_{output.node_id}_output.{output.file_type}"
+            # 使用数据库中存储的自定义文件名，如果没有则生成默认文件名
+            if hasattr(output, 'name') and output.name:
+                filename = output.name
+            else:
+                # 为历史数据生成自定义文件名
+                original_filename = f"node_{output.node_id}_output.{output.file_type}"
+                filename = self._generate_custom_filename(task_id, original_filename)
             
             # 优先使用本地文件URL，如果本地文件不存在则使用原始URL
             local_url = self._get_static_url(output.local_path)
@@ -196,6 +283,10 @@ class FileManager:
         # 先尝试获取本地记录
         local_outputs = self.get_task_outputs(task_id)
         if local_outputs:
+            # 为本地文件添加source标识
+            for output in local_outputs:
+                output['source'] = 'local'
+                output['is_local'] = True
             return local_outputs
         
         # 如果没有本地记录，从RunningHub获取并补充必要字段
@@ -229,7 +320,9 @@ class FileManager:
                     'file_size': None,
                     'static_url': file_url,  # 直接使用远程URL
                     'thumbnail_url': file_url if file_extension.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'] else None,
-                    'created_at': None
+                    'created_at': None,
+                    'source': 'remote',  # 标识为远程文件
+                    'is_local': False    # 标识非本地文件
                 })
             
             return result
@@ -237,6 +330,36 @@ class FileManager:
         except Exception as e:
             current_app.logger.error(f"Error getting remote outputs for task {task_id}: {e}")
             return []
+    
+    def _generate_custom_filename(self, task_id, original_filename, index=0):
+        """根据任务描述和日期生成自定义文件名，包含毫秒时间戳和序号避免重复"""
+        try:
+            # 获取任务信息
+            task = Task.query.filter_by(task_id=task_id).first()
+            
+            # 获取任务描述前20个字符
+            if task and task.task_description:
+                # 清理描述中的特殊字符，只保留中文、英文、数字
+                clean_desc = re.sub(r'[^\w\u4e00-\u9fff]', '', task.task_description)
+                desc_prefix = clean_desc[:20] if clean_desc else 'task'
+            else:
+                desc_prefix = 'task'
+            
+            # 获取当前日期和毫秒时间戳
+            now = datetime.now()
+            date_str = now.strftime('%Y%m%d')
+            timestamp_ms = now.strftime('%H%M%S%f')[:-3]  # 精确到毫秒
+            
+            # 获取原文件扩展名
+            file_ext = os.path.splitext(original_filename)[1] or '.png'
+            
+            # 生成新文件名：描述_日期_时间戳_序号.扩展名
+            new_filename = f"{desc_prefix}_{date_str}_{timestamp_ms}_{index:02d}{file_ext}"
+            
+            return new_filename
+        except Exception as e:
+            current_app.logger.error(f"Error generating custom filename: {e}")
+            return original_filename
     
     def save_output_file(self, task_id, file_name, file_url, file_type='file'):
         """保存单个输出文件"""
@@ -250,22 +373,26 @@ class FileManager:
                 current_app.logger.error(f"Failed to download {file_url}: {response.status_code}")
                 return None
             
-            # 确定文件扩展名
-            file_ext = os.path.splitext(file_name)[1] or '.png'
+            # 生成自定义文件名
+            custom_filename = self._generate_custom_filename(task_id, file_name)
+            file_ext = os.path.splitext(custom_filename)[1]
             
-            # 生成本地文件路径
+            # 生成本地文件路径（使用日期分类，与download_and_save_outputs保持一致）
+            now = datetime.now()
+            year_month = now.strftime('%Y/%m')
+            
             if file_type in ['image', 'png', 'jpg', 'jpeg', 'gif']:
-                local_dir = os.path.join(self.base_dir, 'images', task_id)
+                local_dir = os.path.join(self.base_dir, 'images', year_month)
             elif file_type in ['video', 'mp4', 'avi', 'mov']:
-                local_dir = os.path.join(self.base_dir, 'videos', task_id)
+                local_dir = os.path.join(self.base_dir, 'videos', year_month)
             else:
-                local_dir = os.path.join(self.base_dir, 'documents', task_id)
+                local_dir = os.path.join(self.base_dir, 'documents', year_month)
             
             os.makedirs(local_dir, exist_ok=True)
             
-            # 生成唯一文件名
-            base_name = os.path.splitext(file_name)[0]
-            local_path = os.path.join(local_dir, f"{base_name}{file_ext}")
+            # 使用自定义文件名
+            base_name = os.path.splitext(custom_filename)[0]
+            local_path = os.path.join(local_dir, custom_filename)
             
             # 如果文件已存在，添加序号
             counter = 1
@@ -291,9 +418,10 @@ class FileManager:
             thumbnail_url = self._get_static_url(thumbnail_path) if thumbnail_path else None
             
             # 检查是否已存在相同的输出记录
+            display_name = os.path.basename(local_path)
             existing_output = TaskOutput.query.filter_by(
                 task_id=task_id,
-                name=os.path.basename(local_path)
+                name=display_name
             ).first()
             
             if existing_output:
@@ -310,7 +438,7 @@ class FileManager:
                 task_output = TaskOutput(
                     task_id=task_id,
                     node_id='',  # 默认空值，可以后续更新
-                    name=os.path.basename(local_path),
+                    name=display_name,
                     file_url=file_url,
                     local_path=local_path,
                     thumbnail_path=thumbnail_path,
@@ -346,8 +474,10 @@ class FileManager:
                 # 创建缩略图
                 img.thumbnail(size, Image.Resampling.LANCZOS)
                 
-                # 生成缩略图路径
-                thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', task_id)
+                # 生成缩略图路径（使用日期分类，与其他方法保持一致）
+                now = datetime.now()
+                date_str = now.strftime('%m%d')  # 格式如：0913
+                thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
                 os.makedirs(thumbnail_dir, exist_ok=True)
                 
                 filename = os.path.basename(image_path)

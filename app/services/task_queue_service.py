@@ -74,12 +74,9 @@ class TaskQueueService:
         
         # 更新任务状态为PENDING
         task.status = 'PENDING'
-        # 只在字段存在时才设置
+        # 只在字段存在时才设置started_at，但不设置timeout_at（将在RUNNING状态时设置）
         if hasattr(task, 'started_at'):
             task.started_at = datetime.utcnow()
-        if hasattr(task, 'timeout_at'):
-            timeout_minutes = current_app.config.get('TASK_TIMEOUT_MINUTES', 30)
-            task.timeout_at = datetime.utcnow() + timedelta(minutes=timeout_minutes)
         db.session.commit()
         
         logger.info(f"Task {task_id} status changed to PENDING")
@@ -143,6 +140,11 @@ class TaskQueueService:
             return
         
         logger.info(f"Processing task {next_task.task_id} from queue")
+        
+        # 在提交前再次检查RunningHub状态，避免并发问题
+        if not self.can_start_task():
+            logger.debug(f"RunningHub status changed, cannot start task {next_task.task_id}")
+            return
         
         try:
             # 记录开始提交任务的日志

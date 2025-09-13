@@ -15,8 +15,7 @@ class TaskOutput(db.Model):
     file_size = db.Column(db.Integer, nullable=True)  # 文件大小（字节）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # 关联到任务
-    task = db.relationship('Task', backref=db.backref('outputs', lazy=True))
+    # 关联到任务 - 关系在Task模型中定义
     
     def to_dict(self):
         return {
