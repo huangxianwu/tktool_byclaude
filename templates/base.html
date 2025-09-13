@@ -4,130 +4,301 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RunningHub 工作流自动化平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 自定义样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e293b',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
-    <div class="app-layout">
+<body class="bg-gray-50 font-sans" x-data="{ sidebarOpen: true, mobileMenuOpen: false }" x-init="sidebarOpen = localStorage.getItem('sidebarCollapsed') !== 'true'">
+    <div class="flex h-screen overflow-hidden">
         <!-- 侧边栏 -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-cogs"></i>
-                    <span class="logo-text">RunningHub</span>
+        <aside class="bg-white shadow-lg transition-all duration-300 flex flex-col" 
+               :class="sidebarOpen ? 'w-64' : 'w-16'" 
+               id="sidebar">
+            <!-- 侧边栏头部 -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                <div class="flex items-center space-x-3" :class="!sidebarOpen && 'justify-center'">
+                    <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
+                        <i class="fas fa-cogs text-sm"></i>
+                    </div>
+                    <span class="font-bold text-gray-800 text-lg transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>RunningHub</span>
                 </div>
-                <button class="sidebar-toggle" id="sidebarToggle">
-                    <i class="fas fa-bars"></i>
+                <button @click="sidebarOpen = !sidebarOpen; localStorage.setItem('sidebarCollapsed', !sidebarOpen)" 
+                        class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" 
+                        :class="!sidebarOpen && 'mx-auto'">
+                    <i class="fas fa-bars text-gray-600"></i>
                 </button>
             </div>
             
-            <nav class="sidebar-nav">
-                <ul class="nav-menu">
-                    <li class="nav-item">
-                        <a href="/workflows" class="nav-link" data-page="workflows">
-                            <i class="fas fa-project-diagram"></i>
-                            <span class="nav-text">工作流模板</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/tasks" class="nav-link" data-page="tasks">
-                            <i class="fas fa-tasks"></i>
-                            <span class="nav-text">任务管理</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" data-page="analytics">
-                            <i class="fas fa-chart-bar"></i>
-                            <span class="nav-text">数据分析</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" data-page="settings">
-                            <i class="fas fa-cog"></i>
-                            <span class="nav-text">系统设置</span>
-                        </a>
-                    </li>
-                </ul>
+            <!-- 导航菜单 -->
+            <nav class="flex-1 px-3 py-4 space-y-1">
+                <a href="/workflows" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="workflows">
+                    <i class="fas fa-project-diagram w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>工作流模板</span>
+                </a>
+                <a href="/tasks" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="tasks">
+                    <i class="fas fa-tasks w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>任务管理</span>
+                </a>
+                <a href="#" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="analytics">
+                    <i class="fas fa-chart-bar w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>数据分析</span>
+                </a>
+                <a href="#" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="settings">
+                    <i class="fas fa-cog w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>系统设置</span>
+                </a>
             </nav>
             
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
+            <!-- 侧边栏底部 -->
+            <div class="p-4 border-t border-gray-200">
+                <div class="flex items-center space-x-3" :class="!sidebarOpen && 'justify-center'">
+                    <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-gray-600 text-sm"></i>
                     </div>
-                    <div class="user-details">
-                        <span class="user-name">管理员</span>
-                        <span class="user-role">系统管理员</span>
+                    <div class="transition-opacity duration-300" 
+                         :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                         x-show="sidebarOpen" 
+                         x-transition>
+                        <div class="text-sm font-medium text-gray-800">管理员</div>
+                        <div class="text-xs text-gray-500">系统管理员</div>
                     </div>
                 </div>
             </div>
         </aside>
         
         <!-- 主内容区域 -->
-        <div class="main-content">
-            <header class="top-header">
-                <div class="header-left">
-                    <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <h1 class="page-title">{% block page_title %}工作流自动化平台{% endblock %}</h1>
-                </div>
-                <div class="header-right">
-                    <button class="header-btn" title="通知">
-                        <i class="fas fa-bell"></i>
-                        <span class="badge">3</span>
-                    </button>
-                    <button class="header-btn" title="设置">
-                        <i class="fas fa-cog"></i>
-                    </button>
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- 顶部导航栏 -->
+            <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <!-- 移动端菜单按钮 -->
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" 
+                                class="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                            <i class="fas fa-bars text-gray-600"></i>
+                        </button>
+                        <h1 class="text-2xl font-bold text-gray-800">{% block page_title %}工作流自动化平台{% endblock %}</h1>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <!-- 通知按钮 -->
+                        <button class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" title="通知">
+                            <i class="fas fa-bell text-gray-600"></i>
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-danger text-white text-xs rounded-full flex items-center justify-center">3</span>
+                        </button>
+                        <!-- 设置按钮 -->
+                        <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" title="设置">
+                            <i class="fas fa-cog text-gray-600"></i>
+                        </button>
+                    </div>
                 </div>
             </header>
             
-            <main class="content-area">
+            <!-- 主要内容区 -->
+            <main class="flex-1 overflow-auto p-6 bg-gray-50">
                 {% block content %}{% endblock %}
             </main>
         </div>
     </div>
     
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- 全局消息提示系统 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- 全局JavaScript -->
     <script>
-        // 侧边栏切换功能
+        // 统一消息提示系统
+        window.showToast = function(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const typeClasses = {
+                success: 'bg-green-500 text-white',
+                error: 'bg-red-500 text-white',
+                warning: 'bg-yellow-500 text-white',
+                info: 'bg-blue-500 text-white'
+            };
+            
+            const icons = {
+                success: 'fas fa-check-circle',
+                error: 'fas fa-exclamation-circle',
+                warning: 'fas fa-exclamation-triangle',
+                info: 'fas fa-info-circle'
+            };
+            
+            toast.className = `flex items-center p-4 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 ${typeClasses[type] || typeClasses.info}`;
+            toast.innerHTML = `
+                <i class="${icons[type] || icons.info} mr-2"></i>
+                <span class="flex-1">${message}</span>
+                <button onclick="this.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // 动画显示
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 10);
+            
+            // 自动消失
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 300);
+            }, duration);
+        };
+        
+        // 全局加载状态管理
+        window.showLoading = function(element, text = '加载中...') {
+            if (element) {
+                element.disabled = true;
+                element.dataset.originalText = element.textContent;
+                element.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>${text}`;
+            }
+        };
+        
+        window.hideLoading = function(element) {
+            if (element && element.dataset.originalText) {
+                element.disabled = false;
+                element.textContent = element.dataset.originalText;
+                delete element.dataset.originalText;
+            }
+        };
+        
+        // 全局确认对话框
+        window.showConfirm = function(message, onConfirm, onCancel) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-question-circle text-yellow-500 text-2xl mr-3"></i>
+                        <h3 class="text-lg font-semibold text-gray-900">确认操作</h3>
+                    </div>
+                    <p class="text-gray-600 mb-6">${message}</p>
+                    <div class="flex space-x-3 justify-end">
+                        <button id="cancel-btn" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors duration-200">
+                            取消
+                        </button>
+                        <button id="confirm-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200">
+                            确认
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('#confirm-btn').onclick = () => {
+                modal.remove();
+                if (onConfirm) onConfirm();
+            };
+            
+            modal.querySelector('#cancel-btn').onclick = () => {
+                modal.remove();
+                if (onCancel) onCancel();
+            };
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                    if (onCancel) onCancel();
+                }
+            };
+        };
+        
+        // 页面加载完成后的初始化
         document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.getElementById('sidebarToggle');
-            const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-            
-            function toggleSidebar() {
-                sidebar.classList.toggle('collapsed');
-                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-            }
-            
-            // 桌面端切换
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', toggleSidebar);
-            }
-            
-            // 移动端切换
-            if (mobileMenuToggle) {
-                mobileMenuToggle.addEventListener('click', function() {
-                    sidebar.classList.toggle('mobile-open');
-                });
-            }
-            
-            // 恢复侧边栏状态
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                sidebar.classList.add('collapsed');
-            }
-            
-            // 高亮当前页面
+            // 高亮当前页面导航
             const currentPath = window.location.pathname;
             const navLinks = document.querySelectorAll('.nav-link');
             navLinks.forEach(link => {
+                link.classList.remove('bg-primary', 'text-white');
                 if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('active');
+                    link.classList.add('bg-primary', 'text-white');
+                    link.classList.remove('text-gray-700', 'hover:bg-gray-100');
+                    // 图标也变为白色
+                    const icon = link.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('text-gray-500', 'group-hover:text-primary');
+                        icon.classList.add('text-white');
+                    }
                 }
             });
+            
+            // 为所有卡片添加淡入动画
+            const cards = document.querySelectorAll('.bg-white');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
         });
+        
+        // 移动端响应式处理
+        function handleResize() {
+            if (window.innerWidth >= 768) {
+                // 桌面端：关闭移动菜单
+                const mobileMenuOpen = false;
+            }
+        }
+        
+        window.addEventListener('resize', handleResize);
+        handleResize(); // 初始化调用
     </script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

@@ -1,39 +1,65 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header">
-    <h2>任务详情 #<span id="taskId"></span></h2>
-    <p>状态: <span id="taskStatus"></span></p>
-    <div class="task-actions">
-        <button id="runTaskBtn" onclick="runTask()" class="btn btn-primary" style="display: none;">执行任务</button>
-        <button id="deleteTaskBtn" onclick="deleteTask()" class="btn btn-danger" style="margin-left: 10px;">删除任务</button>
+<!-- 页面头部 -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">
+                任务详情 #<span id="taskId" class="text-blue-600"></span>
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500">状态:</span>
+                <span id="taskStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"></span>
+            </div>
+        </div>
+        <div class="flex space-x-3">
+            <button id="runTaskBtn" onclick="runTask()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2">
+                <i class="fas fa-play text-sm"></i>
+                <span>执行任务</span>
+            </button>
+            <button id="deleteTaskBtn" onclick="deleteTask()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2">
+                <i class="fas fa-trash text-sm"></i>
+                <span>删除任务</span>
+            </button>
+        </div>
     </div>
 </div>
 
-<div class="task-detail">
-    <!-- 原始表单数据 -->
-    <section>
-        <h3>输入参数</h3>
-        <ul id="inputDataList">
+<!-- 任务详情内容 -->
+<div class="space-y-6">
+    <!-- 输入参数 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-cog text-blue-600 mr-2"></i>
+            输入参数
+        </h2>
+        <ul id="inputDataList" class="space-y-3">
             <!-- 输入数据将通过JS动态加载 -->
         </ul>
-    </section>
+    </div>
 
-    <!-- 执行日志流 -->
-    <section>
-        <h3>执行日志</h3>
-        <div id="executionLogs" class="log-stream">
+    <!-- 执行日志 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-terminal text-green-600 mr-2"></i>
+            执行日志
+        </h2>
+        <div id="executionLogs" class="bg-gray-900 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm text-green-400">
             <!-- 日志将通过SSE动态加载 -->
         </div>
-    </section>
+    </div>
 
-    <!-- 结果文件预览 -->
-    <section>
-        <h3>输出结果</h3>
-        <div id="resultPreview" class="result-gallery">
+    <!-- 输出结果 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-file-alt text-purple-600 mr-2"></i>
+            输出结果
+        </h2>
+        <div id="resultPreview" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- 结果将通过JS动态加载 -->
         </div>
-    </section>
+    </div>
 </div>
 
 <script>
@@ -52,9 +78,29 @@ async function loadTaskDetail() {
         // 根据任务状态显示执行按钮
         const runBtn = document.getElementById('runTaskBtn');
         if (task.status === 'PENDING' || task.status === 'FAILED') {
-            runBtn.style.display = 'inline-block';
+            runBtn.classList.remove('hidden');
         } else {
-            runBtn.style.display = 'none';
+            runBtn.classList.add('hidden');
+        }
+        
+        // 更新状态样式
+        const statusSpan = document.getElementById('taskStatus');
+        statusSpan.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+        switch(task.status) {
+            case 'PENDING':
+                statusSpan.classList.add('bg-yellow-100', 'text-yellow-800');
+                break;
+            case 'RUNNING':
+                statusSpan.classList.add('bg-blue-100', 'text-blue-800');
+                break;
+            case 'COMPLETED':
+                statusSpan.classList.add('bg-green-100', 'text-green-800');
+                break;
+            case 'FAILED':
+                statusSpan.classList.add('bg-red-100', 'text-red-800');
+                break;
+            default:
+                statusSpan.classList.add('bg-gray-100', 'text-gray-800');
         }
         
         // 显示输入数据
@@ -75,19 +121,29 @@ async function loadTaskDetail() {
 function renderInputData(data) {
     const container = document.getElementById('inputDataList');
     
+    if (!data || data.length === 0) {
+        container.innerHTML = '<li class="text-gray-500 italic">暂无输入参数</li>';
+        return;
+    }
+    
     container.innerHTML = data.map(item => {
         let valueDisplay = item.field_value;
         
         // 如果是文件类型，显示预览
         if (item.file_url) {
             if (item.file_url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                valueDisplay = `<img src="${item.file_url}" alt="结果图片" style="max-width: 300px;">`;
+                valueDisplay = `<img src="${item.file_url}" alt="结果图片" class="max-w-xs rounded-lg shadow-sm border border-gray-200">`;
             } else if (item.file_url.match(/\.(mp4|avi|mov)$/i)) {
-                valueDisplay = `<video controls style="max-width: 300px;"><source src="${item.file_url}"></video>`;
+                valueDisplay = `<video controls class="max-w-xs rounded-lg shadow-sm border border-gray-200"><source src="${item.file_url}"></video>`;
             }
         }
         
-        return `<li><strong>${item.field_name}:</strong> ${valueDisplay}</li>`;
+        return `
+            <li class="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                <span class="font-medium text-gray-700 min-w-0 flex-shrink-0">${item.field_name}:</span>
+                <div class="min-w-0 flex-1">${valueDisplay}</div>
+            </li>
+        `;
     }).join('');
 }
 
@@ -101,7 +157,7 @@ async function renderResults(data) {
         const outputs = await response.json();
         
         if (!outputs || outputs.length === 0) {
-            container.innerHTML = '<p class="no-results">暂无结果文件</p>';
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-file-alt text-4xl mb-2"></i><p>暂无结果文件</p></div>';
             return;
         }
         
@@ -112,7 +168,7 @@ async function renderResults(data) {
         
     } catch (error) {
         console.error('加载输出文件失败:', error);
-        container.innerHTML = '<p class="error">加载结果文件失败</p>';
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-2"></i><p>加载结果文件失败</p></div>';
     }
 }
 
@@ -127,35 +183,35 @@ function createResultCard(output) {
     if (isImage) {
         const thumbnailUrl = output.thumbnail_url || output.static_url;
         previewContent = `
-            <div class="image-preview">
-                <img src="${thumbnailUrl}" alt="输出图片" loading="lazy" onclick="openImageModal('${output.static_url}')">
-                <div class="image-overlay">
-                    <button class="btn-preview" onclick="openImageModal('${output.static_url}')">
-                        <i class="icon-zoom"></i> 预览
+            <div class="relative group cursor-pointer" onclick="openImageModal('${output.static_url}')">
+                <img src="${thumbnailUrl}" alt="输出图片" loading="lazy" class="w-full h-48 object-cover rounded-lg">
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">
+                    <button class="opacity-0 group-hover:opacity-100 bg-white text-gray-800 px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200">
+                        <i class="fas fa-search-plus mr-1"></i> 预览
                     </button>
                 </div>
             </div>
         `;
     } else if (isVideo) {
         previewContent = `
-            <div class="video-preview">
-                <video poster="${output.thumbnail_url || ''}" onclick="this.play()">
+            <div class="relative group">
+                <video poster="${output.thumbnail_url || ''}" class="w-full h-48 object-cover rounded-lg" onclick="this.play()">
                     <source src="${output.static_url}" type="video/${output.file_type}">
                 </video>
-                <div class="video-overlay">
-                    <button class="btn-play">
-                        <i class="icon-play"></i>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <button class="bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all duration-200">
+                        <i class="fas fa-play text-xl"></i>
                     </button>
                 </div>
             </div>
         `;
     } else {
         previewContent = `
-            <div class="file-preview">
-                <div class="file-icon">
-                    <i class="icon-file"></i>
+            <div class="flex items-center justify-center h-48 bg-gray-100 rounded-lg">
+                <div class="text-center">
+                    <i class="fas fa-file text-4xl text-gray-400 mb-2"></i>
+                    <div class="text-sm font-medium text-gray-600">${output.file_type.toUpperCase()}</div>
                 </div>
-                <div class="file-name">${output.file_type.toUpperCase()}</div>
             </div>
         `;
     }
@@ -169,26 +225,28 @@ function createResultCard(output) {
     const sourceIcon = output.source === 'local' ? '💾' : '☁️';
     
     return `
-        <div class="result-card" data-file-type="${output.file_type}" data-source="${output.source || 'unknown'}">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200" data-file-type="${output.file_type}" data-source="${output.source || 'unknown'}">
             ${previewContent}
-            <div class="card-info">
-                <div class="card-header">
-                    <div class="card-title">${output.name || output.file_name || output.fileName || 'unknown'}</div>
-                    <div class="file-source ${sourceClass}">
-                        <span class="source-icon">${sourceIcon}</span>
-                        <span class="source-text">${sourceLabel}</span>
-                    </div>
+            <div class="p-4">
+                <div class="flex items-start justify-between mb-2">
+                    <h3 class="font-medium text-gray-900 truncate flex-1 mr-2">${output.name || output.file_name || output.fileName || 'unknown'}</h3>
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${output.source === 'local' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'} flex-shrink-0">
+                        <span class="mr-1">${sourceIcon}</span>
+                        ${sourceLabel}
+                    </span>
                 </div>
-                <div class="card-meta">
-                    <span class="file-size">${fileSize}</span>
-                    <span class="created-time">${createdTime}</span>
+                <div class="flex items-center justify-between text-sm text-gray-500 mb-3">
+                    <span>${fileSize}</span>
+                    <span>${createdTime}</span>
                 </div>
-                <div class="card-actions">
-                    <a href="${output.static_url}" download class="btn btn-download">
-                        <i class="icon-download"></i> 下载
+                <div class="flex space-x-2">
+                    <a href="${output.static_url}" download class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
+                        <i class="fas fa-download text-xs"></i>
+                        <span>下载</span>
                     </a>
-                    <a href="${output.static_url}" target="_blank" class="btn btn-external">
-                        <i class="icon-external"></i> 查看文件
+                    <a href="${output.static_url}" target="_blank" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
+                        <i class="fas fa-external-link-alt text-xs"></i>
+                        <span>查看</span>
                     </a>
                 </div>
             </div>
@@ -225,14 +283,17 @@ function setupGalleryListeners() {
 function openImageModal(imageUrl) {
     // 创建模态框
     const modal = document.createElement('div');
-    modal.className = 'image-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
     modal.innerHTML = `
-        <div class="modal-backdrop" onclick="closeImageModal()"></div>
-        <div class="modal-content">
-            <button class="modal-close" onclick="closeImageModal()">&times;</button>
-            <img src="${imageUrl}" alt="预览图片">
-            <div class="modal-actions">
-                <a href="${imageUrl}" download class="btn btn-download">下载图片</a>
+        <div class="absolute inset-0 bg-black bg-opacity-75" onclick="closeImageModal()"></div>
+        <div class="relative bg-white rounded-lg shadow-xl max-w-4xl max-h-full overflow-hidden">
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold z-10 bg-white bg-opacity-80 rounded-full w-8 h-8 flex items-center justify-center" onclick="closeImageModal()">&times;</button>
+            <img src="${imageUrl}" alt="预览图片" class="max-w-full max-h-[80vh] object-contain">
+            <div class="p-4 bg-white">
+                <a href="${imageUrl}" download class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 inline-flex items-center space-x-2">
+                    <i class="fas fa-download"></i>
+                    <span>下载图片</span>
+                </a>
             </div>
         </div>
     `;
@@ -246,7 +307,7 @@ function openImageModal(imageUrl) {
 
 // 关闭图片模态框
 function closeImageModal() {
-    const modal = document.querySelector('.image-modal');
+    const modal = document.querySelector('.fixed.inset-0.z-50');
     if (modal) {
         modal.remove();
         document.body.style.overflow = '';
@@ -343,22 +404,23 @@ function addLogEntry(log) {
     const logsContainer = document.getElementById('executionLogs');
     
     const logEntry = document.createElement('div');
-    logEntry.className = 'log-entry';
+    logEntry.className = 'flex space-x-2 mb-1';
     
     const timestamp = document.createElement('span');
-    timestamp.className = 'timestamp';
+    timestamp.className = 'text-gray-400 text-xs flex-shrink-0 mt-0.5';
     timestamp.textContent = `[${new Date(log.timestamp).toLocaleTimeString()}]`;
     
-    const message = document.createElement('span');
-    message.className = 'message';
+    const message = document.createElement('div');
+    message.className = 'flex-1 min-w-0';
     
     // 检查是否是JSON格式的消息
     if (log.message.trim().startsWith('{') || log.message.includes('"nodeInfoList"')) {
         const pre = document.createElement('pre');
-        pre.className = 'json-log';
+        pre.className = 'text-yellow-300 text-xs whitespace-pre-wrap break-words';
         pre.textContent = log.message;
         message.appendChild(pre);
     } else {
+        message.className += ' text-green-400 text-sm break-words';
         message.textContent = log.message;
     }
     

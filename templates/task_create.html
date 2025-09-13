@@ -1,35 +1,73 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header">
-    <h2>创建任务 - 工作流: <span id="workflowName"></span></h2>
+<!-- 页面头部 -->
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">创建任务</h1>
+            <p class="text-gray-600 mt-1">工作流: <span id="workflowName" class="font-medium text-primary"></span></p>
+        </div>
+        <button onclick="window.history.back()" 
+                class="inline-flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+            <i class="fas fa-arrow-left mr-2"></i>
+            返回
+        </button>
+    </div>
 </div>
 
-<form id="taskForm">
-    <div id="formFields">
-        <!-- 表单字段将通过JS动态生成 -->
-    </div>
-    
-    <!-- 任务描述 -->
-    <div class="form-group">
-        <label for="taskDescription">任务描述:</label>
-        <textarea id="taskDescription" name="task_description" 
-                  placeholder="请输入任务描述，用于在任务列表中区分不同任务" 
-                  rows="3" maxlength="500"></textarea>
-        <small class="form-text text-muted">可选字段，最多500字符，用于任务管理和识别</small>
-    </div>
-    
-    <!-- Plus实例选择 -->
-    <div class="form-group">
-        <label>
-            <input type="checkbox" id="isPlusCheckbox" name="is_plus">
-            是否运行Plus (48G显存机器)
-        </label>
-        <small class="form-text text-muted">选中后将在高性能机器上执行任务</small>
-    </div>
-    
-    <button type="submit">创建任务</button>
-</form>
+<!-- 创建任务表单 -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <form id="taskForm" class="space-y-6">
+        <!-- 动态表单字段 -->
+        <div id="formFields" class="space-y-4">
+            <!-- 表单字段将通过JS动态生成 -->
+        </div>
+        
+        <!-- 任务描述 -->
+        <div>
+            <label for="taskDescription" class="block text-sm font-medium text-gray-700 mb-2">
+                任务描述 (可选)
+            </label>
+            <textarea id="taskDescription" 
+                      name="task_description" 
+                      placeholder="请输入任务描述，用于在任务列表中区分不同任务" 
+                      rows="3" 
+                      maxlength="500"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200 resize-none"></textarea>
+            <p class="text-sm text-gray-500 mt-1">最多500字符，用于任务管理和识别</p>
+        </div>
+        
+        <!-- Plus实例选择 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-start space-x-3">
+                <input type="checkbox" 
+                       id="isPlusCheckbox" 
+                       name="is_plus"
+                       class="mt-1 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                <div class="flex-1">
+                    <label for="isPlusCheckbox" class="text-sm font-medium text-gray-900 cursor-pointer">
+                        是否运行Plus (48G显存机器)
+                    </label>
+                    <p class="text-sm text-gray-600 mt-1">选中后将在高性能机器上执行任务，适用于大型模型和复杂计算</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 提交按钮 -->
+        <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+            <button type="button" 
+                    onclick="window.history.back()" 
+                    class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                取消
+            </button>
+            <button type="submit" 
+                    class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 font-medium">
+                创建任务
+            </button>
+        </div>
+    </form>
+</div>
 
 <script>
 let workflowId = window.location.pathname.split('/').pop();
@@ -54,37 +92,60 @@ function renderFormFields() {
     
     container.innerHTML = workflow.nodes.map(node => {
         let inputHtml = '';
+        const inputClasses = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200';
         
         switch(node.node_type) {
             case 'text':
-                inputHtml = `<input type="text" name="${node.node_id}" placeholder="请输入${node.node_name}" required>`;
+                inputHtml = `<input type="text" name="${node.node_id}" placeholder="请输入${node.node_name}" required class="${inputClasses}">`;
                 break;
             case 'number':
-                inputHtml = `<input type="number" name="${node.node_id}" placeholder="请输入${node.node_name}" required>`;
+                inputHtml = `<input type="number" name="${node.node_id}" placeholder="请输入${node.node_name}" required class="${inputClasses}">`;
                 break;
             case 'image':
                 inputHtml = `
-                    <input type="file" name="${node.node_id}" accept="image/*" required>
-                    <div class="image-preview" id="preview-${node.node_id}" style="display: none;">
-                        <img src="" alt="预览图" style="max-width: 200px; max-height: 200px;">
+                    <div class="space-y-3">
+                        <input type="file" name="${node.node_id}" accept="image/*" required 
+                               class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
+                        <div class="image-preview hidden" id="preview-${node.node_id}">
+                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <img src="" alt="预览图" class="max-w-full h-auto max-h-48 rounded-lg shadow-sm">
+                            </div>
+                        </div>
                     </div>
                 `;
                 break;
             case 'video':
                 inputHtml = `
-                    <input type="file" name="${node.node_id}" accept="video/*" required>
-                    <div class="video-preview" id="preview-${node.node_id}" style="display: none;">
-                        <video controls style="max-width: 300px; max-height: 200px;">
-                            <source src="" type="video/mp4">
-                        </video>
+                    <div class="space-y-3">
+                        <input type="file" name="${node.node_id}" accept="video/*" required 
+                               class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
+                        <div class="video-preview hidden" id="preview-${node.node_id}">
+                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <video controls class="max-w-full h-auto max-h-48 rounded-lg shadow-sm">
+                                    <source src="" type="video/mp4">
+                                </video>
+                            </div>
+                        </div>
                     </div>
                 `;
                 break;
         }
         
+        const typeIcon = {
+            'text': 'fas fa-font',
+            'number': 'fas fa-hashtag', 
+            'image': 'fas fa-image',
+            'video': 'fas fa-video'
+        }[node.node_type] || 'fas fa-circle';
+        
         return `
-            <div class="form-group">
-                <label>${node.node_name} (${node.node_type}):</label>
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                    <i class="${typeIcon} mr-2 text-primary"></i>
+                    ${node.node_name}
+                    <span class="text-xs text-gray-500 ml-2">(${node.node_type})</span>
+                    <span class="text-red-500 ml-1">*</span>
+                </label>
                 ${inputHtml}
             </div>
         `;
@@ -104,7 +165,7 @@ function addFilePreviewListeners() {
                 const preview = document.getElementById(`preview-${this.name}`);
                 const img = preview.querySelector('img');
                 img.src = URL.createObjectURL(file);
-                preview.style.display = 'block';
+                preview.classList.remove('hidden');
             }
         });
     });
@@ -118,7 +179,7 @@ function addFilePreviewListeners() {
                 const video = preview.querySelector('video source');
                 video.src = URL.createObjectURL(file);
                 preview.querySelector('video').load();
-                preview.style.display = 'block';
+                preview.classList.remove('hidden');
             }
         });
     });

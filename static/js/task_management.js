@@ -7,6 +7,9 @@ class TaskManager {
         this.tasks = [];
         this.selectedTasks = new Set();
         this.autoRefreshInterval = null;
+        this.currentPage = 1;
+        this.pageSize = 20;
+        this.totalTasks = 0;
         this.batchOperation = null;
         
         this.init();
@@ -77,7 +80,15 @@ class TaskManager {
         
         emptyState.style.display = 'none';
         
-        tbody.innerHTML = this.tasks.map(task => this.renderTaskRow(task)).join('');
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = startIndex + this.pageSize;
+        const paginatedTasks = this.tasks.slice(startIndex, endIndex);
+        
+        tbody.innerHTML = paginatedTasks.map(task => this.renderTaskRow(task)).join('');
+        
+        // 更新分页信息
+        this.updatePagination();
+        
         this.updateSelectionState();
     }
     
@@ -225,6 +236,56 @@ class TaskManager {
         deleteBtn.disabled = selectedTasks.length === 0;
     }
     
+    updatePagination() {
+        const totalPages = Math.ceil(this.tasks.length / this.pageSize);
+        const startIndex = (this.currentPage - 1) * this.pageSize + 1;
+        const endIndex = Math.min(this.currentPage * this.pageSize, this.tasks.length);
+        
+        document.getElementById('page-start').textContent = this.tasks.length > 0 ? startIndex : 0;
+        document.getElementById('page-end').textContent = endIndex;
+        document.getElementById('total-count').textContent = this.tasks.length;
+        
+        document.getElementById('prev-page').disabled = this.currentPage <= 1;
+        document.getElementById('next-page').disabled = this.currentPage >= totalPages;
+        
+        this.renderPageNumbers(totalPages);
+    }
+
+    renderPageNumbers(totalPages) {
+        const pageNumbers = document.getElementById('page-numbers');
+        let html = '';
+        
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === this.currentPage) {
+                html += `<button class="px-3 py-2 text-sm bg-primary text-white rounded-lg">${i}</button>`;
+            } else {
+                html += `<button onclick="taskManager.goToPage(${i})" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">${i}</button>`;
+            }
+        }
+        
+        pageNumbers.innerHTML = html;
+    }
+
+    previousPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderTasks();
+        }
+    }
+
+    nextPage() {
+        const totalPages = Math.ceil(this.tasks.length / this.pageSize);
+        if (this.currentPage < totalPages) {
+            this.currentPage++;
+            this.renderTasks();
+        }
+    }
+
+    goToPage(page) {
+        this.currentPage = page;
+        this.renderTasks();
+    }
+    
     async startTask(taskId) {
         try {
             const response = await fetch(`/api/tasks/${taskId}/start`, {
@@ -340,7 +401,7 @@ class TaskManager {
             const task = await response.json();
             this.renderTaskDetail(task);
             const drawer = document.getElementById('taskDrawer');
-            drawer.classList.add('open');
+            drawer.classList.remove('hidden');
             
         } catch (error) {
             this.showError('获取任务详情失败: ' + error.message);
@@ -929,7 +990,7 @@ class TaskManager {
     
     closeTaskDetail() {
         const drawer = document.getElementById('taskDrawer');
-        drawer.classList.remove('open');
+        drawer.classList.add('hidden');
     }
     
     closeTaskDrawer() {

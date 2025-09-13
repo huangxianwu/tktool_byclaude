@@ -2,100 +2,235 @@
 
 {% block content %}
 <script src="{{ url_for('static', filename='js/task_management.js') }}" defer></script>
-<div class="task-management">
-    <div class="header-section">
-        <h2>任务管理</h2>
-        <div class="queue-info">
-            <div class="queue-stats">
-                <span class="stat-item">排队任务: <span id="pending-count">0</span></span>
-                <span class="stat-item">运行任务: <span id="running-count">0</span></span>
-                <span class="stat-item">最大并发: <span id="max-concurrent">1</span></span>
-            </div>
-            <div class="refresh-controls">
-                <button class="btn btn-secondary" onclick="refreshTasks()">🔄 刷新</button>
-                <label class="auto-refresh">
-                    <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()"> 自动刷新
-                </label>
-            </div>
+<div class="space-y-6">
+    <!-- 页面头部 -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-900">任务管理</h2>
+            <p class="mt-2 text-gray-600">实时监控和管理任务执行状态</p>
+        </div>
+        <div class="mt-4 lg:mt-0 flex items-center space-x-4">
+            <button onclick="refreshTasks()" 
+                    class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm">
+                <i class="fas fa-sync-alt mr-2"></i>
+                刷新
+            </button>
+            <label class="flex items-center space-x-2 text-sm text-gray-600">
+                <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()" 
+                       class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2">
+                <span>自动刷新</span>
+            </label>
         </div>
     </div>
 
-    <div class="batch-controls">
-        <div class="selection-controls">
-            <label class="select-all">
-                <input type="checkbox" id="select-all" onchange="toggleSelectAll()"> 全选
-            </label>
-            <span class="selection-info">已选择: <span id="selected-count">0</span> 个任务</span>
+    <!-- 统计信息卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-clock text-yellow-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">排队任务</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="pending-count">0</p>
+                </div>
+            </div>
         </div>
         
-        <div class="batch-actions">
-            <button class="btn btn-success" id="batch-start-btn" onclick="batchStartTasks()" disabled>批量启动</button>
-            <button class="btn btn-warning" id="batch-stop-btn" onclick="batchStopTasks()" disabled>批量停止</button>
-            <button class="btn btn-danger" id="batch-delete-btn" onclick="batchDeleteTasks()" disabled>批量删除</button>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-play text-green-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">运行任务</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="running-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-layer-group text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">最大并发</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="max-concurrent">1</p>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- 批量操作控制 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div class="flex items-center space-x-4">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll()" 
+                           class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2">
+                    <span class="text-sm font-medium text-gray-700">全选</span>
+                </label>
+                <span class="text-sm text-gray-600">已选择: <span id="selected-count" class="font-medium text-gray-900">0</span> 个任务</span>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button id="batch-start-btn" onclick="batchStartTasks()" disabled 
+                        class="inline-flex items-center px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-play mr-2"></i>
+                    批量启动
+                </button>
+                <button id="batch-stop-btn" onclick="batchStopTasks()" disabled 
+                        class="inline-flex items-center px-3 py-2 text-sm bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-stop mr-2"></i>
+                    批量停止
+                </button>
+                <button id="batch-delete-btn" onclick="batchDeleteTasks()" disabled 
+                        class="inline-flex items-center px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-trash mr-2"></i>
+                    批量删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任务表格 -->
     <div class="task-table-container">
-        <table class="task-table">
-            <thead>
-                <tr>
-                    <th width="50"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                    <th width="120">本地任务ID</th>
-                    <th>任务描述</th>
-                    <th style="min-width: 120px; max-width: 200px;">工作流名</th>
-                    <th width="200">远程任务ID</th>
-                    <th width="100">PLUS加速</th>
-                    <th width="150">创建时间</th>
-                    <th width="100">运行时长</th>
-                    <th width="80">状态</th>
-                    <th width="200">操作</th>
-                </tr>
-            </thead>
-            <tbody id="taskTableBody">
-                <!-- 任务列表将通过JS动态加载 -->
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="task-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        </th>
+                        <th>
+                            本地任务ID
+                        </th>
+                        <th>
+                            任务描述
+                        </th>
+                        <th>
+                            工作流名
+                        </th>
+                        <th>
+                            远程任务ID
+                        </th>
+                        <th>
+                            PLUS加速
+                        </th>
+                        <th>
+                            创建时间
+                        </th>
+                        <th>
+                            运行时长
+                        </th>
+                        <th>
+                            状态
+                        </th>
+                        <th>
+                            操作
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="taskTableBody">
+                    <!-- 任务列表将通过JS动态加载 -->
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="loading-indicator" id="loading" style="display: none;">
-        <div class="spinner">🔄</div>
-        <span>加载中...</span>
+    <!-- 分页导航 -->
+    <div id="pagination" class="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                显示第 <span id="page-start">1</span> - <span id="page-end">20</span> 条，共 <span id="total-count">0</span> 条记录
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="prev-page" onclick="taskManager.previousPage()" disabled
+                        class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    上一页
+                </button>
+                <div id="page-numbers" class="flex items-center space-x-1">
+                    <!-- 页码按钮将通过JS动态生成 -->
+                </div>
+                <button id="next-page" onclick="taskManager.nextPage()" disabled
+                        class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    下一页
+                    <i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
     </div>
 
-    <div class="empty-state" id="empty-state" style="display: none;">
-        <div class="empty-icon">📋</div>
-        <h3>暂无任务</h3>
-        <p>您还没有创建任何任务</p>
-        <a href="/workflows" class="btn btn-primary">创建新任务</a>
+    <!-- 加载状态 -->
+    <div id="loading" class="hidden flex items-center justify-center py-12">
+        <div class="flex items-center space-x-3 text-gray-600">
+            <i class="fas fa-spinner fa-spin text-xl"></i>
+            <span class="text-lg">加载中...</span>
+        </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div id="empty-state" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-clipboard-list text-2xl text-gray-400"></i>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">暂无任务</h3>
+        <p class="text-gray-500 mb-6">您还没有创建任何任务</p>
+        <a href="/workflows" 
+           class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200">
+            <i class="fas fa-plus mr-2"></i>
+            创建新任务
+        </a>
     </div>
 </div>
 
 <!-- 任务详情侧拉窗 -->
-<div class="task-drawer" id="taskDrawer">
-    <div class="drawer-overlay" onclick="closeTaskDrawer()"></div>
-    <div class="drawer-content">
-        <div class="drawer-header">
-            <h3>任务详情</h3>
-            <button class="close-btn" onclick="closeTaskDrawer()">&times;</button>
+<div id="taskDrawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeTaskDrawer()"></div>
+    <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">任务详情</h3>
+            <button onclick="closeTaskDrawer()" 
+                    class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
-        <div class="drawer-body" id="drawerContent">
+        <div id="drawerContent" class="p-6 overflow-y-auto h-full pb-20">
             <!-- 任务详情内容将在这里动态加载 -->
         </div>
     </div>
 </div>
 
 <!-- 批量操作确认模态框 -->
-<div class="modal" id="batch-confirm-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 id="batch-confirm-title">确认操作</h3>
-            <span class="close" onclick="closeBatchConfirm()">&times;</span>
+<div id="batch-confirm-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeBatchConfirm()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h3 id="batch-confirm-title" class="text-lg font-semibold text-gray-900">确认操作</h3>
+            <button onclick="closeBatchConfirm()" 
+                    class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
-        <div class="modal-body">
-            <p id="batch-confirm-message"></p>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeBatchConfirm()">取消</button>
-                <button class="btn btn-primary" id="batch-confirm-btn" onclick="confirmBatchOperation()">确认</button>
+        <div class="p-6">
+            <p id="batch-confirm-message" class="text-gray-600 mb-6"></p>
+            <div class="flex space-x-3 justify-end">
+                <button onclick="closeBatchConfirm()" 
+                        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                    取消
+                </button>
+                <button id="batch-confirm-btn" onclick="confirmBatchOperation()" 
+                        class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
+                    确认
+                </button>
             </div>
         </div>
     </div>
@@ -168,40 +303,7 @@
     gap: 10px;
 }
 
-.task-table-container {
-    overflow-x: auto;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    margin: 0 -20px;
-    padding: 0 20px;
-    width: calc(100% + 40px);
-}
-
-.task-table {
-    width: 100%;
-    min-width: 1000px;
-    border-collapse: collapse;
-    background: white;
-    table-layout: fixed;
-}
-
-.task-table th {
-    background: #f5f5f5;
-    padding: 12px 8px;
-    text-align: left;
-    border-bottom: 2px solid #ddd;
-    font-weight: 600;
-}
-
-.task-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #eee;
-    vertical-align: middle;
-}
-
-.task-table tbody tr:hover {
-    background: #f8f9fa;
-}
+/* 表格样式已移至 style.css */
 
 .status-badge {
     display: inline-block;
@@ -220,48 +322,7 @@
 .status-failed { background: #f8d7da; color: #721c24; }
 .status-stopped { background: #e2e3e5; color: #383d41; }
 
-.task-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: background-color 0.2s;
-}
-
-.btn-primary { background: #007bff; color: white; }
-.btn-primary:hover { background: #0056b3; }
-
-.btn-success { background: #28a745; color: white; }
-.btn-success:hover { background: #1e7e34; }
-
-.btn-warning { background: #ffc107; color: #212529; }
-.btn-warning:hover { background: #e0a800; }
-
-.btn-danger { background: #dc3545; color: white; }
-.btn-danger:hover { background: #c82333; }
-
-.btn-secondary { background: #6c757d; color: white; }
-.btn-secondary:hover { background: #5a6268; }
-
-.btn-info { background: #17a2b8; color: white; }
-.btn-info:hover { background: #138496; }
-
-.btn-sm {
-    padding: 4px 8px;
-    font-size: 12px;
-    border-radius: 3px;
-}
-
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
+/* 按钮样式已移至 style.css */
 
 .loading-indicator {
     text-align: center;
@@ -390,7 +451,7 @@
     position: absolute;
     top: 0;
     right: 0;
-    width: 600px;
+    width: 800px;
     height: 100%;
     background: white;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);

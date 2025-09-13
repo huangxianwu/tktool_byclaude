@@ -3,94 +3,196 @@
 {% block page_title %}工作流模板管理{% endblock %}
 
 {% block content %}
-<div class="workflow-management">
-    <div class="header-section">
-        <h2>工作流模板管理</h2>
-        <div class="workflow-info">
-            <div class="workflow-stats">
-                <span class="stat-item">总工作流: <span id="total-count">0</span></span>
-                <span class="stat-item">活跃模板: <span id="active-count">0</span></span>
+<div class="space-y-6">
+    <!-- 页面头部 -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-900">工作流模板管理</h2>
+            <p class="mt-2 text-gray-600">创建和管理您的自动化工作流模板</p>
+        </div>
+        <div class="mt-4 lg:mt-0 flex items-center space-x-3">
+            <button onclick="refreshWorkflows()" 
+                    class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm">
+                <i class="fas fa-sync-alt mr-2"></i>
+                刷新
+            </button>
+            <button onclick="createWorkflow()" 
+                    class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 shadow-sm">
+                <i class="fas fa-plus mr-2"></i>
+                新建工作流
+            </button>
+        </div>
+    </div>
+
+    <!-- 统计信息卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-project-diagram text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">总工作流</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="total-count">0</p>
+                </div>
             </div>
-            <div class="workflow-controls">
-                <button class="btn btn-secondary" onclick="refreshWorkflows()">🔄 刷新</button>
-                <button class="btn btn-primary" onclick="createWorkflow()">
-                    <i class="fas fa-plus"></i>
-                    新建工作流
-                </button>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle text-green-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">活跃模板</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="active-count">0</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="workflow-table-container">
-        <table class="workflow-table">
-            <thead>
-                <tr>
-                    <th>工作流名称</th>
-                    <th>工作流ID</th>
-                    <th>描述</th>
-                    <th>节点数</th>
-                    <th>状态</th>
-                    <th>创建时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="workflow-list">
-                <!-- 工作流列表将通过JavaScript动态加载 -->
-            </tbody>
-        </table>
+    <!-- 工作流表格 -->
+    <div id="workflow-table-container" class="workflow-table-container">
+        <div class="overflow-x-auto">
+            <table class="workflow-table">
+                <thead>
+                    <tr>
+                        <th>
+                            工作流名称
+                        </th>
+                        <th>
+                            工作流ID
+                        </th>
+                        <th>
+                            描述
+                        </th>
+                        <th>
+                            节点数
+                        </th>
+                        <th>
+                            状态
+                        </th>
+                        <th>
+                            创建时间
+                        </th>
+                        <th>
+                            操作
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="workflow-list">
+                    <!-- 工作流列表将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="loading-indicator" id="loading" style="display: none;">
-        <div class="spinner">🔄</div>
-        <span>加载中...</span>
+    <!-- 加载状态 -->
+    <div id="loading" class="hidden flex items-center justify-center py-12">
+        <div class="flex items-center space-x-3 text-gray-600">
+            <i class="fas fa-spinner fa-spin text-xl"></i>
+            <span class="text-lg">加载中...</span>
+        </div>
     </div>
 
-    <div class="empty-state" id="empty-state" style="display: none;">
-        <div class="empty-icon">📋</div>
-        <h3>暂无工作流</h3>
-        <p>创建您的第一个工作流模板开始自动化之旅</p>
-        <button class="btn btn-primary" onclick="createWorkflow()">
-            <i class="fas fa-plus"></i>
+    <!-- 空状态 -->
+    <div id="empty-state" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <i class="fas fa-project-diagram text-2xl text-gray-400"></i>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">暂无工作流</h3>
+        <p class="text-gray-500 mb-6">创建您的第一个工作流模板开始自动化之旅</p>
+        <button onclick="createWorkflow()" 
+                class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200">
+            <i class="fas fa-plus mr-2"></i>
             新建工作流
         </button>
     </div>
 </div>
 
 <!-- 新建工作流模态框 -->
-<div id="createModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>新建工作流</h3>
-            <span class="close" onclick="closeModal()">&times;</span>
+<div id="createModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <!-- 模态框头部 -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h3 class="text-xl font-semibold text-gray-900">新建工作流</h3>
+            <button onclick="closeModal()" 
+                    class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
-        <div class="modal-body">
-            <form id="workflowForm">
-                <div class="form-group">
-                    <label>工作流ID (可选):</label>
-                    <input type="text" id="workflowId" placeholder="留空自动生成">
+        
+        <!-- 模态框内容 -->
+        <div class="p-6">
+            <form id="workflowForm" class="space-y-6">
+                <!-- 基本信息 -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="workflowId" class="block text-sm font-medium text-gray-700 mb-2">
+                            工作流ID (可选)
+                        </label>
+                        <input type="text" 
+                               id="workflowId" 
+                               placeholder="留空自动生成"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200">
+                    </div>
+                    
+                    <div>
+                        <label for="workflowName" class="block text-sm font-medium text-gray-700 mb-2">
+                            工作流名称 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               id="workflowName" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200"
+                               placeholder="请输入工作流名称">
+                    </div>
+                    
+                    <div>
+                        <label for="workflowDescription" class="block text-sm font-medium text-gray-700 mb-2">
+                            描述 (可选)
+                        </label>
+                        <textarea id="workflowDescription" 
+                                  placeholder="描述这个工作流的用途"
+                                  rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200 resize-none"></textarea>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label>工作流名称:</label>
-                    <input type="text" id="workflowName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>描述 (可选):</label>
-                    <textarea id="workflowDescription" placeholder="描述这个工作流的用途"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label>节点配置:</label>
-                    <div id="nodesContainer">
+                <!-- 节点配置 -->
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <label class="block text-sm font-medium text-gray-700">
+                            节点配置
+                        </label>
+                        <button type="button" 
+                                onclick="addNode()"
+                                class="inline-flex items-center px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200">
+                            <i class="fas fa-plus mr-1"></i>
+                            添加节点
+                        </button>
+                    </div>
+                    
+                    <div id="nodesContainer" class="space-y-3">
                         <!-- 节点将通过JS动态添加 -->
                     </div>
-                    <button type="button" class="btn btn-secondary" onclick="addNode()">添加节点</button>
                 </div>
                 
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
-                    <button type="submit" class="btn btn-primary">创建</button>
+                <!-- 模态框底部 -->
+                <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+                    <button type="button" 
+                            onclick="closeModal()" 
+                            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                        取消
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200">
+                        创建
+                    </button>
                 </div>
             </form>
         </div>
@@ -115,24 +217,24 @@
 async function loadWorkflows() {
     const loading = document.getElementById('loading');
     const emptyState = document.getElementById('empty-state');
-    const tableContainer = document.querySelector('.workflow-table-container');
+    const tableContainer = document.getElementById('workflow-table-container');
     
-    loading.style.display = 'block';
-    emptyState.style.display = 'none';
-    tableContainer.style.display = 'none';
+    loading.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    tableContainer.classList.add('hidden');
     
     try {
         const response = await fetch('/api/workflows');
         const workflows = await response.json();
         
-        loading.style.display = 'none';
+        loading.classList.add('hidden');
         
         if (!workflows || workflows.length === 0) {
-            emptyState.style.display = 'block';
+            emptyState.classList.remove('hidden');
             return;
         }
         
-        tableContainer.style.display = 'block';
+        tableContainer.classList.remove('hidden');
         
         const tbody = document.getElementById('workflow-list');
         tbody.innerHTML = workflows.map(wf => {
@@ -523,17 +625,26 @@ document.addEventListener('DOMContentLoaded', loadWorkflows);
 }
 
 .workflow-table th {
-    background: #f5f5f5;
-    padding: 12px 8px;
+    background: #f9fafb;
+    padding: 16px 12px;
     text-align: left;
-    border-bottom: 2px solid #ddd;
-    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 500;
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
 }
 
 .workflow-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #eee;
+    padding: 16px 12px;
+    border-bottom: 1px solid #f3f4f6;
     vertical-align: middle;
+    font-size: 14px;
+    font-weight: 400;
+    color: #374151;
+    line-height: 1.5;
 }
 
 .workflow-table tbody tr:hover {
@@ -587,21 +698,78 @@ document.addEventListener('DOMContentLoaded', loadWorkflows);
 
 .workflow-actions {
     display: flex;
-    gap: 5px;
+    gap: 8px;
     align-items: center;
+    justify-content: flex-start;
 }
 
-.btn {
+.workflow-actions .btn {
     padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
     font-size: 12px;
-    transition: background-color 0.2s;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    min-width: auto;
+}
+
+.workflow-actions .btn-primary {
+    background-color: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.workflow-actions .btn-primary:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+.workflow-actions .btn-success {
+    background-color: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.workflow-actions .btn-success:hover {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+.workflow-actions .btn-warning {
+    background-color: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.workflow-actions .btn-warning:hover {
+    background-color: #d97706;
+    border-color: #d97706;
+}
+
+.workflow-actions .btn-secondary {
+    background-color: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.workflow-actions .btn-secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
+.workflow-actions .btn-danger {
+    background-color: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+.workflow-actions .btn-danger:hover {
+     background-color: #dc2626;
+     border-color: #dc2626;
 }
 
 .btn-sm {
