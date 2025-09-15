@@ -42,7 +42,7 @@
                     <span class="font-bold text-gray-800 text-lg transition-opacity duration-300" 
                           :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
                           x-show="sidebarOpen" 
-                          x-transition>RunningHub</span>
+                          x-transition>ComfyUI</span>
                 </div>
                 <button @click="sidebarOpen = !sidebarOpen; localStorage.setItem('sidebarCollapsed', !sidebarOpen)" 
                         class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" 
@@ -71,24 +71,7 @@
                           x-show="sidebarOpen" 
                           x-transition>任务管理</span>
                 </a>
-                <a href="#" 
-                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
-                   data-page="analytics">
-                    <i class="fas fa-chart-bar w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
-                    <span class="ml-3 font-medium transition-opacity duration-300" 
-                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
-                          x-show="sidebarOpen" 
-                          x-transition>数据分析</span>
-                </a>
-                <a href="#" 
-                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
-                   data-page="settings">
-                    <i class="fas fa-cog w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
-                    <span class="ml-3 font-medium transition-opacity duration-300" 
-                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
-                          x-show="sidebarOpen" 
-                          x-transition>系统设置</span>
-                </a>
+                
             </nav>
             
             <!-- 侧边栏底部 -->
@@ -122,11 +105,7 @@
                         <h1 class="text-2xl font-bold text-gray-800">{% block page_title %}工作流自动化平台{% endblock %}</h1>
                     </div>
                     <div class="flex items-center space-x-3">
-                        <!-- 通知按钮 -->
-                        <button class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" title="通知">
-                            <i class="fas fa-bell text-gray-600"></i>
-                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-danger text-white text-xs rounded-full flex items-center justify-center">3</span>
-                        </button>
+                        
                         <!-- 设置按钮 -->
                         <button class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200" title="设置">
                             <i class="fas fa-cog text-gray-600"></i>

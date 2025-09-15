@@ -5,12 +5,23 @@
 class TaskManager {
     constructor() {
         this.tasks = [];
+        this.filteredTasks = [];
         this.selectedTasks = new Set();
         this.autoRefreshInterval = null;
         this.currentPage = 1;
         this.pageSize = 20;
         this.totalTasks = 0;
         this.batchOperation = null;
+        this.workflows = [];
+        this.filters = {
+            status: '',
+            workflow: '',
+            timeRange: '',
+            search: '',
+            sort: 'created_at_desc',
+            startDate: '',
+            endDate: ''
+        };
         
         this.init();
     }
@@ -28,18 +39,106 @@ class TaskManager {
                 clearInterval(this.autoRefreshInterval);
             }
         });
+        
+        // 绑定筛选事件
+        this.bindFilterEvents();
+    }
+    
+    bindFilterEvents() {
+        // 状态筛选
+        document.getElementById('status-filter').addEventListener('change', (e) => {
+            this.filters.status = e.target.value;
+            this.loadTasks();
+        });
+        
+        // 工作流筛选
+        document.getElementById('workflow-filter').addEventListener('change', (e) => {
+            this.filters.workflow = e.target.value;
+            this.loadTasks();
+        });
+        
+        // 时间范围筛选
+        document.getElementById('time-filter').addEventListener('change', (e) => {
+            this.filters.timeRange = e.target.value;
+            this.toggleCustomDateRange(e.target.value === 'custom');
+            this.handleTimeRangeFilter();
+        });
+        
+        // 排序
+        document.getElementById('sort-filter').addEventListener('change', (e) => {
+            this.filters.sort = e.target.value;
+            this.loadTasks();
+        });
+        
+        // 搜索
+        let searchTimeout;
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.filters.search = e.target.value.trim();
+                this.loadTasks();
+            }, 300);
+        });
+        
+        // 自定义时间范围
+        document.getElementById('start-date').addEventListener('change', (e) => {
+            this.filters.startDate = e.target.value;
+            if (this.filters.timeRange === 'custom') {
+                this.loadTasks();
+            }
+        });
+        
+        document.getElementById('end-date').addEventListener('change', (e) => {
+            this.filters.endDate = e.target.value;
+            if (this.filters.timeRange === 'custom') {
+                this.loadTasks();
+            }
+        });
+        
+        // 重置筛选
+        document.getElementById('reset-filters').addEventListener('click', () => {
+            this.resetFilters();
+        });
     }
     
     async loadTasks() {
         this.showLoading(true);
         
         try {
-            const response = await fetch('/api/tasks');
+            // 构建查询参数
+            const params = new URLSearchParams();
+            
+            if (this.filters.status) {
+                params.append('status', this.filters.status);
+            }
+            if (this.filters.workflow) {
+                params.append('workflow_id', this.filters.workflow);
+            }
+            if (this.filters.search) {
+                params.append('search', this.filters.search);
+            }
+            if (this.filters.startDate) {
+                params.append('start_date', this.filters.startDate);
+            }
+            if (this.filters.endDate) {
+                params.append('end_date', this.filters.endDate);
+            }
+            
+            // 处理排序参数
+            const [sortBy, sortOrder] = this.filters.sort.split('_');
+            params.append('sort_by', sortBy);
+            params.append('sort_order', sortOrder);
+            
+            const url = `/api/tasks${params.toString() ? '?' + params.toString() : ''}`;
+            const response = await fetch(url);
+            
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             this.tasks = await response.json();
+            this.filteredTasks = this.tasks; // 直接使用后端筛选的结果
+            await this.loadWorkflows();
             this.renderTasks();
             
         } catch (error) {
@@ -48,6 +147,216 @@ class TaskManager {
         } finally {
             this.showLoading(false);
         }
+    }
+    
+    async loadWorkflows() {
+        try {
+            const response = await fetch('/api/workflows');
+            if (response.ok) {
+                this.workflows = await response.json();
+                this.populateWorkflowFilter();
+            }
+        } catch (error) {
+            console.error('加载工作流失败:', error);
+        }
+    }
+    
+    populateWorkflowFilter() {
+        const workflowSelect = document.getElementById('workflow-filter');
+        // 保存当前选中的值
+        const currentValue = workflowSelect.value;
+        
+        // 清除现有选项（保留第一个"全部工作流"选项）
+        while (workflowSelect.children.length > 1) {
+            workflowSelect.removeChild(workflowSelect.lastChild);
+        }
+        
+        // 添加工作流选项
+        this.workflows.forEach(workflow => {
+            const option = document.createElement('option');
+            option.value = workflow.id;
+            option.textContent = workflow.name || `工作流 ${workflow.id}`;
+            workflowSelect.appendChild(option);
+        });
+        
+        // 恢复之前选中的值
+        if (currentValue && this.workflows.some(w => w.id == currentValue)) {
+            workflowSelect.value = currentValue;
+        }
+    }
+    
+    applyFilters() {
+        let filtered = [...this.tasks];
+        
+        // 状态筛选
+        if (this.filters.status) {
+            filtered = filtered.filter(task => task.status.toLowerCase() === this.filters.status);
+        }
+        
+        // 工作流筛选
+        if (this.filters.workflow) {
+            filtered = filtered.filter(task => task.workflow_id == this.filters.workflow);
+        }
+        
+        // 搜索筛选
+        if (this.filters.search) {
+            const searchLower = this.filters.search.toLowerCase();
+            filtered = filtered.filter(task => 
+                (task.description && task.description.toLowerCase().includes(searchLower)) ||
+                (task.local_task_id && task.local_task_id.toString().includes(searchLower))
+            );
+        }
+        
+        // 时间范围筛选
+        filtered = this.applyTimeFilter(filtered);
+        
+        // 排序
+        filtered = this.applySorting(filtered);
+        
+        this.filteredTasks = filtered;
+        this.currentPage = 1; // 重置到第一页
+        this.renderTasks();
+    }
+    
+    applyTimeFilter(tasks) {
+        if (!this.filters.timeRange) return tasks;
+        
+        const now = new Date();
+        let startDate, endDate;
+        
+        switch (this.filters.timeRange) {
+            case 'today':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                break;
+            case 'week':
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - now.getDay());
+                weekStart.setHours(0, 0, 0, 0);
+                startDate = weekStart;
+                endDate = new Date(weekStart);
+                endDate.setDate(weekStart.getDate() + 7);
+                break;
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                break;
+            case 'custom':
+                if (this.filters.startDate) {
+                    startDate = new Date(this.filters.startDate);
+                }
+                if (this.filters.endDate) {
+                    endDate = new Date(this.filters.endDate);
+                }
+                break;
+            default:
+                return tasks;
+        }
+        
+        return tasks.filter(task => {
+            const taskDate = new Date(task.created_at);
+            const afterStart = !startDate || taskDate >= startDate;
+            const beforeEnd = !endDate || taskDate < endDate;
+            return afterStart && beforeEnd;
+        });
+    }
+    
+    applySorting(tasks) {
+        const [field, direction] = this.filters.sort.split('_');
+        const isDesc = direction === 'desc';
+        
+        return tasks.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (field) {
+                case 'created':
+                    aValue = new Date(a.created_at);
+                    bValue = new Date(b.created_at);
+                    break;
+                case 'updated':
+                    aValue = new Date(a.updated_at || a.created_at);
+                    bValue = new Date(b.updated_at || b.created_at);
+                    break;
+                case 'status':
+                    aValue = a.status;
+                    bValue = b.status;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (aValue < bValue) return isDesc ? 1 : -1;
+            if (aValue > bValue) return isDesc ? -1 : 1;
+            return 0;
+        });
+    }
+    
+    toggleCustomDateRange(show) {
+        const customDateRange = document.getElementById('custom-date-range');
+        if (show) {
+            customDateRange.classList.remove('hidden');
+        } else {
+            customDateRange.classList.add('hidden');
+        }
+    }
+    
+    handleTimeRangeFilter() {
+        const timeRange = this.filters.timeRange;
+        const now = new Date();
+        
+        switch (timeRange) {
+            case 'today':
+                this.filters.startDate = now.toISOString().split('T')[0];
+                this.filters.endDate = now.toISOString().split('T')[0];
+                break;
+            case 'week':
+                const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                this.filters.startDate = weekAgo.toISOString().split('T')[0];
+                this.filters.endDate = now.toISOString().split('T')[0];
+                break;
+            case 'month':
+                const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                this.filters.startDate = monthAgo.toISOString().split('T')[0];
+                this.filters.endDate = now.toISOString().split('T')[0];
+                break;
+            case 'custom':
+                // 自定义时间范围，不自动设置日期
+                return;
+            default:
+                this.filters.startDate = '';
+                this.filters.endDate = '';
+                break;
+        }
+        
+        this.loadTasks();
+    }
+    
+    resetFilters() {
+        // 重置筛选条件
+        this.filters = {
+            status: '',
+            workflow: '',
+            timeRange: '',
+            search: '',
+            sort: 'created_at_desc',
+            startDate: '',
+            endDate: ''
+        };
+        
+        // 重置表单元素
+        document.getElementById('status-filter').value = '';
+        document.getElementById('workflow-filter').value = '';
+        document.getElementById('time-filter').value = '';
+        document.getElementById('search-input').value = '';
+        document.getElementById('sort-filter').value = 'created_at_desc';
+        document.getElementById('start-date').value = '';
+        document.getElementById('end-date').value = '';
+        
+        // 隐藏自定义时间范围
+        this.toggleCustomDateRange(false);
+        
+        // 重新加载任务
+        this.loadTasks();
     }
     
     async loadQueueStatus() {
@@ -72,7 +381,10 @@ class TaskManager {
         const tbody = document.getElementById('taskTableBody');
         const emptyState = document.getElementById('empty-state');
         
-        if (!this.tasks || this.tasks.length === 0) {
+        // 使用筛选后的任务数据
+        const tasksToRender = this.filteredTasks || this.tasks || [];
+        
+        if (tasksToRender.length === 0) {
             tbody.innerHTML = '';
             emptyState.style.display = 'block';
             return;
@@ -82,7 +394,7 @@ class TaskManager {
         
         const startIndex = (this.currentPage - 1) * this.pageSize;
         const endIndex = startIndex + this.pageSize;
-        const paginatedTasks = this.tasks.slice(startIndex, endIndex);
+        const paginatedTasks = tasksToRender.slice(startIndex, endIndex);
         
         tbody.innerHTML = paginatedTasks.map(task => this.renderTaskRow(task)).join('');
         
@@ -237,13 +549,15 @@ class TaskManager {
     }
     
     updatePagination() {
-        const totalPages = Math.ceil(this.tasks.length / this.pageSize);
+        const tasksToRender = this.filteredTasks || this.tasks || [];
+        const totalTasks = tasksToRender.length;
+        const totalPages = Math.ceil(totalTasks / this.pageSize);
         const startIndex = (this.currentPage - 1) * this.pageSize + 1;
-        const endIndex = Math.min(this.currentPage * this.pageSize, this.tasks.length);
+        const endIndex = Math.min(this.currentPage * this.pageSize, totalTasks);
         
-        document.getElementById('page-start').textContent = this.tasks.length > 0 ? startIndex : 0;
+        document.getElementById('page-start').textContent = totalTasks > 0 ? startIndex : 0;
         document.getElementById('page-end').textContent = endIndex;
-        document.getElementById('total-count').textContent = this.tasks.length;
+        document.getElementById('total-count').textContent = totalTasks;
         
         document.getElementById('prev-page').disabled = this.currentPage <= 1;
         document.getElementById('next-page').disabled = this.currentPage >= totalPages;
@@ -392,298 +706,11 @@ class TaskManager {
     }
     
     async showTaskDetail(taskId) {
-        try {
-            const response = await fetch(`/api/tasks/${taskId}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const task = await response.json();
-            this.renderTaskDetail(task);
-            const drawer = document.getElementById('taskDrawer');
-            drawer.classList.remove('hidden');
-            
-        } catch (error) {
-            this.showError('获取任务详情失败: ' + error.message);
-        }
+        // 跳转到独立的任务详情页面
+        window.location.href = `/task_detail/${taskId}`;
     }
     
-    renderTaskDetail(task) {
-        const content = document.getElementById('drawerContent');
-        const createdAt = new Date(task.created_at).toLocaleString();
-        const startedAt = task.started_at ? new Date(task.started_at).toLocaleString() : '未开始';
-        const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString() : '未完成';
-        
-        content.innerHTML = `
-            <div class="task-detail-section">
-                <h4>基本信息</h4>
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <label>任务ID:</label>
-                        <span>${task.task_id}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>工作流名称:</label>
-                        <span>${task.workflow_name || 'Unknown'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>任务描述:</label>
-                        <span>${task.task_description || '无描述'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>状态:</label>
-                        <span class="status-badge status-${task.status.toLowerCase()}">${this.getStatusText(task.status)}</span>
-                        ${task.runninghub_task_id && ['FAILED', 'RUNNING', 'QUEUED', 'PENDING'].includes(task.status) ? `<button class="btn btn-info btn-sm" onclick="taskManager.updateTaskStatus('${task.task_id}')" style="margin-left: 10px;">更新状态</button>` : ''}
-                    </div>
-                    <div class="detail-item">
-                        <label>创建时间:</label>
-                        <span>${createdAt}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>开始时间:</label>
-                        <span>${startedAt}</span>
-                    </div>
-                    <div class="detail-item">
-                        <label>完成时间:</label>
-                        <span>${completedAt}</span>
-                    </div>
-                    ${task.runninghub_task_id ? `
-                    <div class="detail-item">
-                        <label>RunningHub任务ID:</label>
-                        <span>${task.runninghub_task_id}</span>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-            
-            ${task.data && task.data.length > 0 ? `
-            <div class="task-detail-section">
-                <h4>输入参数</h4>
-                <div class="task-data-list">
-                    ${task.data.map(data => {
-                        let valueDisplay = data.field_value;
-                        // 如果是文件类型，显示预览
-                        if (data.file_url) {
-                            if (data.file_url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                                valueDisplay = `<img src="${data.file_url}" alt="输入图片" style="max-width: 200px; border-radius: 4px;">`;
-                            } else if (data.file_url.match(/\.(mp4|avi|mov)$/i)) {
-                                valueDisplay = `<video controls style="max-width: 200px;"><source src="${data.file_url}"></video>`;
-                            }
-                        }
-                        return `
-                            <div class="task-data-item">
-                                <strong>${data.field_name}:</strong>
-                                <div class="field-value">${valueDisplay}</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-            ` : ''}
-            
-            <div class="task-detail-section">
-                <h4>执行日志</h4>
-                <div id="modal-execution-logs" class="log-stream modal-logs">
-                    <div class="loading-logs">加载日志中...</div>
-                </div>
-            </div>
-            
-            <div class="task-detail-section">
-                <div class="section-header">
-                    <h4>输出结果</h4>
-                    <button id="refresh-files-btn" class="btn btn-sm btn-outline-primary" onclick="taskManager.refreshTaskFiles('${task.task_id}')">
-                        <i class="fas fa-sync-alt"></i> 更新文件
-                    </button>
-                </div>
-                <div id="modal-result-preview" class="result-gallery modal-results">
-                    <div class="loading-results">加载结果中...</div>
-                </div>
-            </div>
-        `;
-        
-        // 加载日志和结果
-        this.loadModalLogs(task.task_id);
-        this.loadModalResults(task.task_id);
-        
-        // 添加样式
-        if (!document.querySelector('#task-detail-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'task-detail-styles';
-            styles.textContent = `
-                .task-detail-section {
-                    margin-bottom: 20px;
-                }
-                .task-detail-section h4 {
-                    margin-bottom: 10px;
-                    color: #333;
-                }
-                .section-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 10px;
-                }
-                .section-header h4 {
-                    margin: 0;
-                }
-                #refresh-files-btn {
-                    font-size: 12px;
-                    padding: 4px 8px;
-                }
-                .detail-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 10px;
-                }
-                .detail-item {
-                    display: flex;
-                    flex-direction: column;
-                }
-                .detail-item label {
-                    font-weight: bold;
-                    color: #666;
-                    margin-bottom: 2px;
-                }
-                .task-data-item {
-                    margin-bottom: 8px;
-                    padding: 8px;
-                    background: #f8f9fa;
-                    border-radius: 4px;
-                }
-                .field-value {
-                    margin-top: 4px;
-                }
-                .modal-logs {
-                    max-height: 200px;
-                    overflow-y: auto;
-                    background: #f8f9fa;
-                    border: 1px solid #dee2e6;
-                    border-radius: 4px;
-                    padding: 10px;
-                    font-family: monospace;
-                    font-size: 12px;
-                }
-                .modal-results {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                    gap: 15px;
-                    max-height: 400px;
-                    overflow-y: auto;
-                }
-                .result-card {
-                    border: 1px solid #e0e0e0;
-                    border-radius: 8px;
-                    overflow: hidden;
-                    background: white;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .result-card:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-                }
-                .image-preview, .video-preview, .file-preview {
-                    position: relative;
-                    height: 150px;
-                    overflow: hidden;
-                }
-                .image-preview img, .video-preview video {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                    cursor: pointer;
-                }
-                .image-overlay, .video-overlay {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0,0,0,0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    transition: opacity 0.2s;
-                }
-                .image-preview:hover .image-overlay,
-                .video-preview:hover .video-overlay {
-                    opacity: 1;
-                }
-                .btn-preview, .btn-play {
-                    background: rgba(255,255,255,0.9);
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                }
-                .file-preview {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    background: #f8f9fa;
-                    color: #666;
-                }
-                .file-icon {
-                    font-size: 48px;
-                    margin-bottom: 8px;
-                }
-                .file-name {
-                    font-weight: bold;
-                    font-size: 14px;
-                }
-                .card-info {
-                    padding: 12px;
-                }
-                .card-title {
-                    font-weight: bold;
-                    margin-bottom: 8px;
-                    color: #333;
-                }
-                .card-meta {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 12px;
-                    color: #666;
-                    margin-bottom: 10px;
-                }
-                .card-actions {
-                    display: flex;
-                    gap: 8px;
-                }
-                .btn {
-                    padding: 6px 12px;
-                    text-decoration: none;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    text-align: center;
-                    flex: 1;
-                }
-                .btn-download {
-                    background: #007bff;
-                    color: white;
-                }
-                .btn-external {
-                    background: #28a745;
-                    color: white;
-                }
-                .btn:hover {
-                    opacity: 0.8;
-                }
-                .log-entry {
-                    margin-bottom: 4px;
-                    word-wrap: break-word;
-                }
-                .log-timestamp {
-                    color: #666;
-                    margin-right: 8px;
-                }
-            `;
-            document.head.appendChild(styles);
-        }
-    }
+    // renderTaskDetail方法已移除，现在使用独立的任务详情页面
     
     async loadModalLogs(taskId) {
         try {

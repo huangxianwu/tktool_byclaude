@@ -7,6 +7,7 @@ from flask import current_app
 from app import db
 from app.models.Task import Task
 from app.services.runninghub import RunningHubService
+from app.services.central_queue_manager import central_queue_manager, TriggerSource
 import logging
 import threading
 import time
@@ -91,9 +92,12 @@ class TaskStatusService:
                         db.session.add(complete_log)
                         db.session.commit()
                         
-                        from app.services.task_queue_service import TaskQueueService
-                        queue_service = TaskQueueService()
-                        queue_service.process_queue()
+                        # 任务完成后，通过中央管理器触发队列处理
+                        central_queue_manager.request_queue_processing(
+                            trigger_source=TriggerSource.TASK_COMPLETE,
+                            reason=f"Task {task_id} completed with status {new_status}",
+                            task_id=task_id
+                        )
                 else:
                     no_change_log = TaskLog(
                         task_id=task_id,
@@ -217,8 +221,11 @@ class TaskStatusService:
                         
                         if timeout_count > 0:
                             logger.warning(f"Found {timeout_count} timeout tasks, processing queue...")
-                            # 只有在实际处理了超时任务时才触发队列处理
-                            queue_service.process_queue()
+                            # 只有在实际处理了超时任务时才通过中央管理器触发队列处理
+                            central_queue_manager.request_queue_processing(
+                                trigger_source=TriggerSource.STATUS_MONITOR,
+                                reason=f"Found {timeout_count} timeout tasks"
+                            )
                         
                         # 检查并处理PENDING状态的任务
                         self._process_pending_tasks(queue_service)
@@ -266,8 +273,11 @@ class TaskStatusService:
                 
                 if can_process:
                     logger.info(f"Found {len(pending_tasks)} pending tasks and RunningHub is idle, processing queue...")
-                    # 触发队列处理
-                    queue_service.process_queue()
+                    # 通过中央管理器触发队列处理
+                    central_queue_manager.request_queue_processing(
+                        trigger_source=TriggerSource.PENDING_CHECK,
+                        reason="RunningHub is idle, processing pending tasks"
+                    )
                 else:
                     logger.debug(f"Found {len(pending_tasks)} pending tasks but RunningHub has {current_tasks} running tasks, waiting...")
         except Exception as e:

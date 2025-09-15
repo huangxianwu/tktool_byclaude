@@ -7,6 +7,7 @@ from flask import current_app
 from app import db
 from app.models.Task import Task
 from app.services.runninghub import RunningHubService
+from app.services.central_queue_manager import central_queue_manager, TriggerSource
 import logging
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,11 @@ class TaskQueueService:
         logger.info(f"Task {task_id} status changed to PENDING")
         
         # 尝试立即处理队列
-        self.process_queue()
+        central_queue_manager.request_queue_processing(
+            trigger_source=TriggerSource.USER_START,
+            reason=f"User started task {task_id}",
+            task_id=task_id
+        )
         
         return True, "任务已加入队列"
     
@@ -117,116 +122,26 @@ class TaskQueueService:
         logger.info(f"Task {task_id} stopped")
         
         # 处理队列，启动下一个任务
-        self.process_queue()
+        central_queue_manager.request_queue_processing(
+            trigger_source=TriggerSource.TASK_STOP,
+            reason=f"Task {task_id} stopped",
+            task_id=task_id
+        )
         
         return True, "任务已停止"
     
     def process_queue(self):
-        """处理任务队列，启动下一个可执行的任务"""
-        # 检查是否有可用的执行槽位
-        if not self.can_start_task():
-            # 获取RunningHub当前任务数量用于日志
-            current_tasks = self.runninghub_service.check_account_status()
-            if current_tasks is not None and current_tasks > 0:
-                logger.debug(f"RunningHub has {current_tasks} running tasks, waiting for completion")
-            else:
-                logger.debug("No available slots for new tasks")
-            return
+        """处理任务队列 - 已弃用，请使用CentralQueueManager
         
-        # 获取下一个待执行的任务
-        next_task = self.get_next_pending_task()
-        if not next_task:
-            logger.debug("No pending tasks in queue")
-            return
-        
-        logger.info(f"Processing task {next_task.task_id} from queue")
-        
-        # 在提交前再次检查RunningHub状态，避免并发问题
-        if not self.can_start_task():
-            logger.debug(f"RunningHub status changed, cannot start task {next_task.task_id}")
-            return
-        
-        try:
-            # 记录开始提交任务的日志
-            from app.models.TaskLog import TaskLog
-            start_log = TaskLog(
-                task_id=next_task.task_id,
-                message="🚀 开始提交任务到RunningHub..."
-            )
-            db.session.add(start_log)
-            db.session.commit()
-            
-            # 提交任务到RunningHub
-            success, runninghub_task_id, error_msg = self.submit_task_to_runninghub(next_task)
-            
-            if success:
-                # 更新任务状态
-                next_task.status = 'QUEUED'
-                next_task.runninghub_task_id = runninghub_task_id
-                next_task.started_at = datetime.utcnow()
-                db.session.commit()
-                
-                logger.info(f"Task {next_task.task_id} submitted to RunningHub with ID: {runninghub_task_id}")
-                
-                # 记录成功提交的日志
-                success_log = TaskLog(
-                    task_id=next_task.task_id,
-                    message=f"✅ 任务已成功提交到RunningHub (ID: {runninghub_task_id})"
-                )
-                db.session.add(success_log)
-                db.session.commit()
-            else:
-                # 检查是否是队列满的错误
-                if error_msg and 'TASK_QUEUE_MAXED' in error_msg:
-                    # 队列满时，任务保持PENDING状态，等待下次处理
-                    logger.info(f"RunningHub queue is full, task {next_task.task_id} remains in PENDING status")
-                    
-                    # 记录队列满的日志（避免重复记录）
-                    from app.models.TaskLog import TaskLog
-                    existing_queue_log = TaskLog.query.filter_by(
-                        task_id=next_task.task_id
-                    ).filter(
-                        TaskLog.message.like('%队列已满%')
-                    ).first()
-                    
-                    if not existing_queue_log:
-                        queue_log = TaskLog(
-                            task_id=next_task.task_id,
-                            message=f"⏳ RunningHub队列已满，等待空闲槽位..."
-                        )
-                        db.session.add(queue_log)
-                        db.session.commit()
-                    return  # 不标记为失败，保持PENDING状态
-                else:
-                    # 其他错误，标记为失败
-                    next_task.status = 'FAILED'
-                    next_task.completed_at = datetime.utcnow()
-                    
-                    # 记录失败日志
-                    from app.models.TaskLog import TaskLog
-                    error_log = TaskLog(
-                        task_id=next_task.task_id,
-                        message=f"❌ 任务提交失败: {error_msg or 'Unknown error'}"
-                    )
-                    db.session.add(error_log)
-                    db.session.commit()
-                    
-                    logger.error(f"Failed to submit task {next_task.task_id} to RunningHub: {error_msg}")
-        
-        except Exception as e:
-            logger.error(f"Error processing queue: {e}")
-            # 标记任务为失败
-            next_task.status = 'FAILED'
-            next_task.completed_at = datetime.utcnow()
-            
-            # 记录异常日志
-            from app.models.TaskLog import TaskLog
-            exception_log = TaskLog(
-                task_id=next_task.task_id,
-                message=f"❌ 队列处理异常: {str(e)}"
-            )
-            db.session.add(exception_log)
-            db.session.commit()
+        此方法已被CentralQueueManager替代，保留仅为兼容性。
+        新代码应使用: central_queue_manager.request_queue_processing()
+        """
+        logger.warning("process_queue() is deprecated, use CentralQueueManager instead")
+        # 委托给中央管理器处理
+        central_queue_manager.request_queue_processing(
+            trigger_source=TriggerSource.USER_START,  # 默认触发源
+            reason="Legacy process_queue call"
+        )
     
     def submit_task_to_runninghub(self, task):
         """提交任务到RunningHub"""
@@ -388,7 +303,10 @@ class TaskQueueService:
         
         # 如果有超时任务，处理队列
         if timeout_count > 0:
-            self.process_queue()
+            central_queue_manager.request_queue_processing(
+                trigger_source=TriggerSource.TIMEOUT_CHECK,
+                reason=f"Processed {timeout_count} timeout tasks"
+            )
         
         return timeout_count
 

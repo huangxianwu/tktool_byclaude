@@ -174,251 +174,7 @@
     font-size: 0.8em;
 }
 
-/* 现代化侧拉窗样式 */
-.sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
-    backdrop-filter: blur(8px);
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sidebar-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.sidebar {
-    position: fixed;
-    top: 0;
-    right: -700px;
-    width: 700px;
-    height: 100%;
-    background: linear-gradient(145deg, #ffffff, #f8fafc);
-    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12), -4px 0 16px rgba(0, 0, 0, 0.08);
-    border-left: 1px solid rgba(226, 232, 240, 0.8);
-    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1001;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar.active {
-    right: 0;
-    transform: translateX(0);
-}
-
-.sidebar-header {
-            padding: 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            position: relative;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .sidebar-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-            pointer-events: none;
-        }
-
-        .header-content {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            z-index: 1;
-        }
-
-        .header-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            backdrop-filter: blur(10px);
-        }
-
-        .header-text h3 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 700;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-subtitle {
-            margin: 4px 0 0 0;
-            font-size: 14px;
-            opacity: 0.8;
-            font-weight: 400;
-        }
-
-.sidebar-close {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            font-size: 16px;
-            cursor: pointer;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(10px);
-            z-index: 1;
-        }
-
-        .sidebar-close:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-.sidebar-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-    background: #ffffff;
-}
-
-.sidebar-body::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-body::-webkit-scrollbar-track {
-    background: #f1f5f9;
-}
-
-.sidebar-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #cbd5e1, #94a3b8);
-    border-radius: 3px;
-}
-
-.sidebar-footer {
-            padding: 24px 32px;
-            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-            border-top: 1px solid rgba(226, 232, 240, 0.8);
-            flex-shrink: 0;
-        }
-
-        .footer-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .footer-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .secondary-btn {
-            background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-            color: #475569;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .secondary-btn:hover {
-            background: linear-gradient(135deg, #cbd5e1, #94a3b8);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .primary-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-        }
-
-        .primary-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .primary-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-        }
-
-        .primary-btn:hover::before {
-            left: 100%;
-        }
-
-/* 状态更新按钮 */
-.status-update-btn {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 12px;
-    cursor: pointer;
-    margin-left: 16px;
-    font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.status-update-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-}
-
-.status-update-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-}
-
-.status-update-btn:hover::before {
-    left: 100%;
-}
-
-.status-update-btn:active {
-    transform: translateY(0);
-}
+/* 侧拉页相关CSS样式已移除，改为独立详情页 */
 
 .status-badge {
     display: inline-flex;
@@ -1260,6 +1016,344 @@
     color: #667eea;
 }
 
+/* 现代化结果卡片样式 */
+.result-card-modern {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    margin-bottom: 16px;
+}
+
+.result-card-modern:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.result-preview-modern {
+    position: relative;
+    cursor: pointer;
+}
+
+.result-image-modern {
+    width: 100%;
+    height: 192px;
+    object-fit: cover;
+    border-radius: 12px 12px 0 0;
+}
+
+.image-overlay-modern {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border-radius: 12px 12px 0 0;
+}
+
+.result-preview-modern:hover .image-overlay-modern {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.btn-preview-modern {
+    opacity: 0;
+    background: white;
+    color: #374151;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.result-preview-modern:hover .btn-preview-modern {
+    opacity: 1;
+}
+
+.result-video-modern {
+    width: 100%;
+    height: 320px; /* 9:16比例高度 */
+    object-fit: cover;
+    border-radius: 12px 12px 0 0;
+}
+
+.video-overlay-modern {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-play-btn {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 12px;
+    border-radius: 50%;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.video-play-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.video-info-header {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 12px 12px 0 0;
+}
+
+.video-source-info, .video-link-info {
+    margin-bottom: 4px;
+}
+
+.video-source-info:last-child {
+    margin-bottom: 0;
+}
+
+.video-label {
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.video-value {
+    color: #e5e7eb;
+    word-break: break-all;
+}
+
+.result-file-modern {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 192px;
+    background: #f9fafb;
+    border-radius: 12px 12px 0 0;
+}
+
+.file-icon-container {
+    text-align: center;
+}
+
+.file-icon-large {
+    font-size: 48px;
+    color: #9ca3af;
+    margin-bottom: 8px;
+}
+
+.file-type-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.result-card-content {
+    padding: 16px;
+}
+
+.result-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.file-info-container {
+    flex: 1;
+    margin-right: 8px;
+}
+
+.file-name-modern {
+    font-weight: 500;
+    color: #111827;
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    word-break: break-all;
+}
+
+.file-details {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.file-path-info, .file-source-info {
+    margin-bottom: 2px;
+    word-break: break-all;
+}
+
+.source-badge-local {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #dbeafe;
+    color: #1e40af;
+    flex-shrink: 0;
+}
+
+.source-badge-remote {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #dcfce7;
+    color: #166534;
+    flex-shrink: 0;
+}
+
+.source-icon {
+    margin-right: 4px;
+}
+
+.file-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.meta-full {
+    grid-column: span 2;
+}
+
+.meta-label {
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.result-actions-modern {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-modern {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.btn-download {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-download:hover {
+    background: #1d4ed8;
+}
+
+.btn-view {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-view:hover {
+    background: #e5e7eb;
+}
+
+/* 现代化日志容器样式 */
+.log-container-modern {
+    background: #1f2937;
+    border-radius: 8px;
+    padding: 16px;
+    height: 400px;
+    overflow-y: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #10b981;
+    border: 1px solid #374151;
+}
+
+.log-entry {
+    margin-bottom: 4px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.log-time {
+    color: #6b7280;
+    font-size: 12px;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.log-message {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-info .log-message {
+    color: #10b981;
+}
+
+.log-error .log-message {
+    color: #ef4444;
+}
+
+.log-warning .log-message {
+    color: #f59e0b;
+}
+
+.log-debug .log-message {
+    color: #8b5cf6;
+}
+
+.json-log {
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 4px 0;
+    font-size: 12px;
+    color: #d1d5db;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+
+.text-green-600 {
+    color: #10b981;
+}
+
+.btn-original {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-original:hover {
+    background: #e5e7eb;
+}
+
 .file-preview {
     display: flex;
     flex-direction: column;
@@ -1286,6 +1380,154 @@
 .file-preview:hover .file-icon {
     transform: scale(1.1);
     background: rgba(102, 126, 234, 0.2);
+}
+
+/* 新侧拉页样式 */
+.info-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 24px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+.info-card .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 20px;
+    border-bottom: none;
+}
+
+.info-card .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-card .card-body {
+    padding: 20px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 14px;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+.input-params-container {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+}
+
+.param-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.param-item:last-child {
+    border-bottom: none;
+}
+
+.param-key {
+    font-weight: 500;
+    color: #374151;
+}
+
+.param-value {
+    color: #6b7280;
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.result-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.result-file-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.result-file-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+}
+
+.result-file-card .file-icon {
+    font-size: 24px;
+    color: #6b7280;
+    margin-bottom: 8px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #1f2937;
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+
+.file-size {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.download-all-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.download-all-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .file-name {
@@ -1451,136 +1693,326 @@
         font-size: 0.85em;
     }
 }
+
+/* 文件来源标识样式 */
+.file-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.file-source.local {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.file-source.remote {
+    background-color: #cce7ff;
+    color: #004085;
+    border: 1px solid #b3d7ff;
+}
+
+/* 文件路径显示样式 */
+.file-path {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 4px;
+    padding: 4px 0;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.file-path i {
+    color: #ffc107;
+}
+
+/* 文件元信息样式优化 */
+.file-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* 结果操作按钮样式优化 */
+.result-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.result-actions .btn {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+/* 新设计侧拉页样式 */
+.info-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    padding: 16px 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-title i {
+    color: #667eea;
+}
+
+.card-body {
+    padding: 24px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-item.full-width {
+    grid-column: span 2;
+}
+
+.info-item label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 14px;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.header-info h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-subtitle {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+.param-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.param-key {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.param-value {
+    font-size: 14px;
+    color: #1e293b;
+    word-break: break-all;
+}
+
+.log-container {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #e2e8f0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.result-file-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+}
+
+.result-file-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.file-icon {
+    width: 40px;
+    height: 40px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #64748b;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.file-details {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 侧拉页视频预览卡片样式 */
+.video-preview-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    overflow: hidden;
+}
+
+.video-preview-card .video-info-header {
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.video-preview-card .result-preview-modern {
+    position: relative;
+    width: 100%;
+    margin: 0;
+}
+
+.video-preview-card .result-video-modern {
+    width: 100%;
+    height: 320px; /* 9:16 比例高度 */
+    object-fit: cover;
+    border: none;
+    border-radius: 0;
+}
+
+.video-preview-card .file-info-footer {
+    padding: 12px 16px;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+}
+
+.video-preview-card .file-info-footer .file-name {
+    margin-bottom: 4px;
+}
+
+.video-preview-card .file-info-footer .file-size {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-download {
+    background: #667eea;
+    color: white;
+}
+
+.btn-download:hover {
+    background: #5a67d8;
+}
+
+.btn-view {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.btn-view:hover {
+    background: #e2e8f0;
+}
 </style>
 
 
 
-<!-- 任务详情侧拉窗 -->
-<div id="taskDetailSidebar" class="sidebar-overlay">
-    <div class="sidebar">
-        <!-- 侧拉窗头部 -->
-        <div class="sidebar-header">
-            <div class="header-content">
-                <div class="header-icon">
-                    <i class="fas fa-tasks"></i>
-                </div>
-                <div class="header-text">
-                    <h3>任务详情</h3>
-                    <p class="header-subtitle">Task Details</p>
-                </div>
-            </div>
-            <button class="sidebar-close" onclick="closeTaskDetailSidebar()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <!-- 侧拉窗主体内容 -->
-        <div class="sidebar-body">
-            <!-- 任务概览卡片 -->
-            <div class="task-overview-card">
-                <div class="overview-header">
-                    <div class="task-id-section">
-                        <span class="task-id-label">任务ID</span>
-                        <span id="detailTaskId" class="task-id-value"></span>
-                    </div>
-                    <div id="detailStatus" class="status-badge"></div>
-                </div>
-                <div class="overview-meta">
-                    <div class="meta-item">
-                        <i class="fas fa-project-diagram"></i>
-                        <span class="meta-label">工作流</span>
-                        <span id="detailWorkflowName" class="meta-value"></span>
-                    </div>
-                    <div class="meta-item">
-                        <i class="fas fa-clock"></i>
-                        <span class="meta-label">创建时间</span>
-                        <span id="detailCreatedAt" class="meta-value"></span>
-                    </div>
-                </div>
-                <div class="overview-actions">
-                    <button id="statusUpdateBtn" class="action-btn update-btn" onclick="updateTaskStatus()" style="display: none;">
-                        <i class="fas fa-sync-alt"></i>
-                        <span>更新状态</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 输入参数卡片 -->
-            <div class="detail-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-sign-in-alt"></i>
-                        <span>输入参数</span>
-                    </div>
-                    <div class="card-badge">Input Parameters</div>
-                </div>
-                <div class="card-content">
-                    <div id="detailInputData" class="input-data-container">
-                        <!-- 输入数据将动态加载 -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- 执行日志卡片 -->
-            <div class="detail-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-terminal"></i>
-                        <span>执行日志</span>
-                    </div>
-                    <div class="card-actions">
-                        <button class="card-action-btn" onclick="toggleLogExpand()" title="展开/收起">
-                            <i class="fas fa-expand-alt"></i>
-                        </button>
-                        <button class="card-action-btn" onclick="refreshLogs()" title="刷新日志">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <div id="detailLogs" class="log-container">
-                        <!-- 日志将动态加载 -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- 执行结果卡片 -->
-            <div class="detail-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-file-export"></i>
-                        <span>执行结果</span>
-                    </div>
-                    <div class="card-actions">
-                        <button id="downloadAllFilesBtn" class="card-action-btn download-all-btn" onclick="downloadAllFiles()" style="display: none;" title="下载所有文件">
-                            <i class="fas fa-download"></i>
-                            <span>下载全部</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <div id="detailResults" class="result-gallery">
-                        <!-- 结果文件将动态加载 -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 侧拉窗底部 -->
-        <div class="sidebar-footer">
-            <div class="footer-actions">
-                <button class="footer-btn secondary-btn" onclick="closeTaskDetailSidebar()">
-                    <i class="fas fa-times"></i>
-                    <span>关闭</span>
-                </button>
-                <button id="detailRunBtn" class="footer-btn primary-btn" onclick="runTaskFromDetail()" style="display: none;">
-                    <i class="fas fa-play"></i>
-                    <span>执行任务</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- 任务详情侧拉窗 - 全新设计 -->
+<!-- 侧拉页已移除，改为独立详情页 -->
 
 <script>
 // 加载任务列表
@@ -1686,9 +2118,9 @@ async function runTask(taskId) {
     }
 }
 
-// 查看任务详情 - 改为侧拉窗模式
+// 查看任务详情 - 跳转到独立详情页
 function viewTask(taskId) {
-    showTaskDetailSidebar(taskId);
+    window.location.href = `/task_detail/${taskId}`;
 }
 
 // 删除任务
@@ -1713,612 +2145,37 @@ async function deleteTask(taskId) {
 }
 
 // 任务详情弹窗相关变量
-let currentTaskId = null;
-let logExpanded = false;
-let logRefreshInterval = null;
-let eventSource = null;
+// 侧拉页相关变量已移除
 
-// 显示任务详情侧拉窗
-async function showTaskDetailSidebar(taskId) {
-    currentTaskId = taskId;
+// 侧拉页相关函数已移除，改为独立详情页
+
+// 格式化持续时间
+function formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
     
-    try {
-        // 获取任务详情
-        const response = await fetch(`/api/tasks/${taskId}`);
-        const task = await response.json();
-        
-        // 填充基本信息
-        document.getElementById('detailTaskId').textContent = task.task_id.slice(0, 8) + '...';
-        document.getElementById('detailWorkflowName').textContent = task.workflow_name || 'Unknown';
-        
-        const statusElement = document.getElementById('detailStatus');
-        const statusMap = {
-            'PENDING': { class: 'status-pending', text: '等待中' },
-            'RUNNING': { class: 'status-running', text: '运行中' },
-            'SUCCESS': { class: 'status-success', text: '成功' },
-            'FAILED': { class: 'status-failed', text: '失败' },
-            'READY': { class: 'status-ready', text: '就绪' }
-        };
-        const status = statusMap[task.status] || { class: 'status-pending', text: task.status };
-        statusElement.className = `status-badge ${status.class}`;
-        statusElement.textContent = status.text;
-        
-        document.getElementById('detailCreatedAt').textContent = new Date(task.created_at).toLocaleString();
-        
-        // 显示执行按钮（如果任务可执行）
-        const runBtn = document.getElementById('detailRunBtn');
-        if (task.status === 'READY' || task.status === 'FAILED') {
-            runBtn.style.display = 'inline-block';
-        } else {
-            runBtn.style.display = 'none';
-        }
-        
-        // 加载输入数据
-        loadInputData(task.data || []);
-        
-        // 加载执行日志
-        loadTaskLogs();
-        
-        // 加载结果文件
-        loadTaskResults();
-        
-        // 显示侧拉窗
-        const sidebar = document.getElementById('taskDetailSidebar');
-        sidebar.classList.add('active');
-        
-        // 开始定时刷新日志（如果任务正在运行）
-        if (task.status === 'RUNNING' || task.status === 'PENDING') {
-            startLogRefresh();
-        }
-        
-    } catch (error) {
-        console.error('加载任务详情失败:', error);
-        alert('加载任务详情失败');
+    if (hours > 0) {
+        return `${hours}小时${minutes % 60}分钟${seconds % 60}秒`;
+    } else if (minutes > 0) {
+        return `${minutes}分钟${seconds % 60}秒`;
+    } else {
+        return `${seconds}秒`;
     }
 }
 
-// 关闭任务详情侧拉窗
-function closeTaskDetailSidebar() {
-    const sidebar = document.getElementById('taskDetailSidebar');
-    sidebar.classList.remove('active');
-    currentTaskId = null;
-    stopLogRefresh();
-    // 关闭SSE连接
-    if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-    }
-}
+// 侧拉页输入数据加载函数已移除
 
-// 加载输入数据
-function loadInputData(data) {
-    const container = document.getElementById('detailInputData');
-    
-    if (!data || data.length === 0) {
-        container.innerHTML = '<p class="no-data">暂无输入数据</p>';
-        return;
-    }
-    
-    container.innerHTML = data.map(item => {
-        let valueDisplay = item.field_value;
-        
-        // 处理长文本
-        if (typeof valueDisplay === 'string' && valueDisplay.length > 100) {
-            valueDisplay = valueDisplay.substring(0, 100) + '...';
-        }
-        
-        // 处理文件类型
-        if (item.field_value && typeof item.field_value === 'string') {
-            if (item.field_value.startsWith('http') && item.field_value.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                valueDisplay = `<img src="${item.field_value}" alt="输入图片" class="input-preview-image">`;
-            } else if (item.field_value.startsWith('http') && item.field_value.match(/\.(mp4|avi|mov)$/i)) {
-                valueDisplay = `<video controls class="input-preview-video"><source src="${item.field_value}"></video>`;
-            }
-        }
-        
-        return `
-            <div class="input-data-item">
-                <div class="input-label">${item.field_name}:</div>
-                <div class="input-value">${valueDisplay}</div>
-            </div>
-        `;
-    }).join('');
-}
-
-// 加载任务日志
-async function loadTaskLogs() {
-    if (!currentTaskId) return;
-    
-    try {
-        // 先加载历史日志
-        await loadHistoryLogs();
-        
-        // 启动实时日志流
-        startLogStream();
-        
-    } catch (error) {
-        console.error('加载日志失败:', error);
-        document.getElementById('detailLogs').innerHTML = '<p class="error-message">加载日志失败</p>';
-    }
-}
+// 侧拉页日志加载函数已移除
 
 // 加载历史日志
-async function loadHistoryLogs() {
-    try {
-        const response = await fetch(`/api/tasks/${currentTaskId}/logs/history`);
-        const logs = await response.json();
-        
-        const container = document.getElementById('detailLogs');
-        container.innerHTML = ''; // 清空现有日志
-        
-        if (!logs || logs.length === 0) {
-            container.innerHTML = '<p class="no-data">暂无执行日志</p>';
-            return;
-        }
-        
-        logs.forEach(log => {
-            addLogEntry({
-                message: log.message,
-                timestamp: log.timestamp,
-                level: log.level
-            });
-        });
-        
-    } catch (error) {
-        console.error('加载历史日志失败:', error);
-        // 回退到原有的日志加载方式
-        const response = await fetch(`/api/tasks/${currentTaskId}/logs/history`);
-        const logs = await response.json();
-        
-        const container = document.getElementById('detailLogs');
-        if (!logs || logs.length === 0) {
-            container.innerHTML = '<p class="no-data">暂无执行日志</p>';
-            return;
-        }
-        
-        container.innerHTML = logs.map(log => {
-            const timestamp = new Date(log.timestamp).toLocaleTimeString();
-            const levelClass = log.level ? `log-${log.level.toLowerCase()}` : 'log-info';
-            
-            return `
-                <div class="log-entry ${levelClass}">
-                    <span class="log-time">[${timestamp}]</span>
-                    <span class="log-message">${log.message}</span>
-                </div>
-            `;
-        }).join('');
-        
-        // 滚动到底部
-        container.scrollTop = container.scrollHeight;
-    }
-}
+// 侧拉页历史日志加载函数已移除
 
-// 启动日志流
-function startLogStream() {
-    // 关闭现有连接
-    if (eventSource) {
-        eventSource.close();
-    }
-    
-    // 启动SSE连接
-    eventSource = new EventSource(`/api/tasks/${currentTaskId}/logs`);
-    
-    eventSource.onmessage = function(event) {
-        try {
-            const log = JSON.parse(event.data);
-            addLogEntry({
-                message: log.message,
-                timestamp: log.timestamp,
-                level: log.level
-            });
-        } catch (error) {
-            console.error('解析日志数据失败:', error);
-        }
-    };
-    
-    eventSource.onerror = function(error) {
-        console.error('SSE连接错误:', error);
-        // 连接错误时回退到轮询模式
-        eventSource.close();
-        setTimeout(() => {
-            startLogRefresh();
-        }, 1000);
-    };
-}
+// 侧拉页日志流和结果加载函数已移除
 
-// 添加日志条目
-function addLogEntry(log) {
-    const logsContainer = document.getElementById('detailLogs');
-    
-    const logEntry = document.createElement('div');
-    const logClass = log.level ? `log-${log.level.toLowerCase()}` : 'log-info';
-    logEntry.className = `log-entry ${logClass}`;
-    
-    const timestamp = document.createElement('span');
-    timestamp.className = 'log-time';
-    timestamp.textContent = `[${new Date(log.timestamp).toLocaleTimeString()}]`;
-    
-    const message = document.createElement('span');
-    message.className = 'log-message';
-    
-    // 检查是否是JSON格式的消息
-    if (log.message.trim().startsWith('{') || log.message.includes('"nodeInfoList"')) {
-        const pre = document.createElement('pre');
-        pre.className = 'json-log';
-        pre.textContent = log.message;
-        message.appendChild(pre);
-    } else {
-        message.textContent = log.message;
-    }
-    
-    logEntry.appendChild(timestamp);
-    logEntry.appendChild(message);
-    logsContainer.appendChild(logEntry);
-    
-    // 自动滚动到底部
-    logsContainer.scrollTop = logsContainer.scrollHeight;
-}
+// 侧拉页结果卡片创建函数已移除
 
-// 加载任务结果
-async function loadTaskResults() {
-    if (!currentTaskId) return;
-    
-    try {
-        const response = await fetch(`/api/tasks/${currentTaskId}/outputs?t=${Date.now()}`);
-        const outputs = await response.json();
-        
-        const container = document.getElementById('detailResults');
-        const downloadBtn = document.getElementById('downloadAllFilesBtn');
-        
-        if (!outputs || outputs.length === 0) {
-            container.innerHTML = '<p class="no-data">暂无执行结果</p>';
-            downloadBtn.style.display = 'none';
-            return;
-        }
-        
-        container.innerHTML = outputs.map(output => createResultCard(output)).join('');
-        
-        // 显示下载所有文件按钮
-        downloadBtn.style.display = 'inline-block';
-        
-        // 添加事件监听器
-        setupGalleryListeners();
-        
-    } catch (error) {
-        console.error('加载结果失败:', error);
-        document.getElementById('detailResults').innerHTML = '<p class="error-message">加载结果失败</p>';
-        document.getElementById('downloadAllFilesBtn').style.display = 'none';
-    }
-}
-
-// 创建结果卡片
-function createResultCard(output) {
-    const fileName = output.name || output.file_name || output.fileName || 'unknown';
-    const fileUrl = output.file_url || output.fileUrl || output.static_url;
-    const fileType = output.file_type || fileName.split('.').pop().toLowerCase();
-    const isImage = fileType && fileType.match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
-    const isVideo = fileType && fileType.match(/^(mp4|avi|mov|wmv|flv)$/);
-    
-    let previewContent = '';
-    
-    if (isImage) {
-        const thumbnailUrl = output.thumbnail_url || fileUrl;
-        previewContent = `
-            <div class="result-preview">
-                <img src="${thumbnailUrl}" alt="结果图片" class="result-image" onclick="openImageModal('${fileUrl}')">
-                <div class="image-overlay">
-                    <button class="btn-preview" onclick="openImageModal('${fileUrl}')">
-                        <i class="fas fa-search-plus"></i> 预览
-                    </button>
-                </div>
-            </div>
-        `;
-    } else if (isVideo) {
-        previewContent = `
-            <div class="result-preview">
-                <video controls class="result-video">
-                    <source src="${fileUrl}" type="video/${fileType}">
-                </video>
-            </div>
-        `;
-    } else {
-        previewContent = `
-            <div class="result-file">
-                <i class="fas fa-file"></i>
-                <span>${fileName}</span>
-            </div>
-        `;
-    }
-    
-    const fileSize = formatFileSize(output.file_size);
-    const createdTime = output.created_at ? new Date(output.created_at).toLocaleString() : '';
-    
-    // 文件来源标识
-    const sourceLabel = output.source === 'local' ? 
-        '<span class="file-source local"><i class="fas fa-hdd"></i> 本地</span>' : 
-        '<span class="file-source remote"><i class="fas fa-cloud"></i> 远程</span>';
-    
-    return `
-        <div class="result-item" data-file-type="${fileType}" data-source="${output.source || 'unknown'}">
-            ${previewContent}
-            <div class="result-info">
-                <div class="file-meta">
-                    <span class="file-name">${fileName}</span>
-                    ${sourceLabel}
-                </div>
-                ${fileSize ? `<div class="file-size">${fileSize}</div>` : ''}
-                ${createdTime ? `<div class="file-time">${createdTime}</div>` : ''}
-            </div>
-            <div class="result-actions">
-                <button class="btn btn-sm btn-primary" onclick="openFileInNewTab('${fileUrl}')">
-                    <i class="fas fa-external-link-alt"></i>
-                    查看
-                </button>
-                <button class="btn btn-sm btn-secondary" onclick="downloadFile('${fileUrl}', '${fileName}')">
-                    <i class="fas fa-download"></i>
-                    下载
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-// 格式化文件大小
-function formatFileSize(bytes) {
-    if (!bytes) return '未知大小';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-// 设置图片库事件监听器
-function setupGalleryListeners() {
-    // 图片预览点击事件
-    document.querySelectorAll('.result-image').forEach(img => {
-        img.addEventListener('click', function() {
-            openImageModal(this.src);
-        });
-    });
-}
-
-// 打开图片模态框
-function openImageModal(imageUrl) {
-    // 创建模态框
-    const modal = document.createElement('div');
-    modal.className = 'image-modal';
-    modal.innerHTML = `
-        <div class="modal-backdrop" onclick="closeImageModal()"></div>
-        <div class="modal-content">
-            <button class="modal-close" onclick="closeImageModal()">&times;</button>
-            <img src="${imageUrl}" alt="预览图片">
-            <div class="modal-actions">
-                <a href="${imageUrl}" download class="btn btn-download">下载图片</a>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    document.body.style.overflow = 'hidden';
-    
-    // 添加键盘支持
-    document.addEventListener('keydown', handleModalKeydown);
-}
-
-// 关闭图片模态框
-function closeImageModal() {
-    const modal = document.querySelector('.image-modal');
-    if (modal) {
-        modal.remove();
-        document.body.style.overflow = '';
-        document.removeEventListener('keydown', handleModalKeydown);
-    }
-}
-
-// 模态框键盘处理
-function handleModalKeydown(event) {
-    if (event.key === 'Escape') {
-        closeImageModal();
-    }
-}
-
-// 下载单个文件
-function downloadFile(fileUrl, fileName) {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// 在新标签页打开文件
-function openFileInNewTab(fileUrl) {
-    window.open(fileUrl, '_blank');
-}
-
-// 下载所有文件
-async function downloadAllFiles() {
-    if (!currentTaskId) return;
-    
-    const downloadBtn = document.getElementById('downloadAllFilesBtn');
-    const originalText = downloadBtn.innerHTML;
-    
-    try {
-        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 下载中...';
-        downloadBtn.disabled = true;
-        
-        const response = await fetch(`/api/tasks/${currentTaskId}/download-files`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            alert(`成功下载 ${result.total_count} 个文件到本地！`);
-            // 重新加载结果以显示本地文件
-            loadTaskResults();
-        } else {
-            alert(`下载失败: ${result.error}`);
-        }
-        
-    } catch (error) {
-        console.error('下载文件失败:', error);
-        alert('下载文件失败');
-    } finally {
-        downloadBtn.innerHTML = originalText;
-        downloadBtn.disabled = false;
-    }
-}
-
-// 切换日志展开/收起
-function toggleLogExpand() {
-    const container = document.getElementById('detailLogs');
-    logExpanded = !logExpanded;
-    
-    if (logExpanded) {
-        container.style.maxHeight = 'none';
-        container.style.height = '400px';
-    } else {
-        container.style.maxHeight = '200px';
-        container.style.height = '200px';
-    }
-}
-
-// 刷新日志
-function refreshLogs() {
-    if (currentTaskId) {
-        loadHistoryLogs();
-    }
-}
-
-// 开始日志自动刷新
-function startLogRefresh() {
-    if (logRefreshInterval) {
-        clearInterval(logRefreshInterval);
-    }
-    logRefreshInterval = setInterval(() => {
-        loadTaskLogs();
-    }, 3000); // 每3秒刷新一次
-}
-
-// 停止日志自动刷新
-function stopLogRefresh() {
-    if (logRefreshInterval) {
-        clearInterval(logRefreshInterval);
-        logRefreshInterval = null;
-    }
-    // 关闭SSE连接
-    if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-    }
-}
-
-// 从详情页执行任务
-async function runTaskFromDetail() {
-    if (!currentTaskId) return;
-    
-    try {
-        const response = await fetch(`/api/tasks/${currentTaskId}/start`, {
-            method: 'POST'
-        });
-        
-        if (response.ok) {
-            alert('任务已开始执行');
-            // 重新加载详情
-            showTaskDetailSidebar(currentTaskId);
-            // 刷新任务列表
-            loadTasks();
-        } else {
-            alert('启动任务失败');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('启动任务失败');
-    }
-}
-
-// 下载文件
-function downloadFile(fileUrl, fileName) {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// 在新标签页打开文件
-function openFileInNewTab(fileUrl) {
-    window.open(fileUrl, '_blank');
-}
-
-// 更新任务状态
-async function updateTaskStatus(taskId, remoteTaskId) {
-    if (!remoteTaskId) {
-        alert('该任务没有远程任务ID，无法更新状态');
-        return;
-    }
-    
-    try {
-        // 显示加载状态
-        const updateBtn = document.getElementById('updateStatusBtn');
-        const originalText = updateBtn.innerHTML;
-        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
-        updateBtn.disabled = true;
-        
-        // 调用后端API更新状态
-        const response = await fetch(`/api/tasks/${taskId}/update-status`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                remote_task_id: remoteTaskId
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            alert(`状态更新成功：${result.old_status} → ${result.new_status}`);
-            // 重新加载任务详情
-            showTaskDetailSidebar(taskId);
-            // 刷新任务列表
-            loadTasks();
-        } else {
-            alert(`更新失败：${result.error || '未知错误'}`);
-        }
-    } catch (error) {
-        console.error('更新任务状态失败:', error);
-        alert('更新任务状态失败，请稍后重试');
-    } finally {
-        // 恢复按钮状态
-        const updateBtn = document.getElementById('updateStatusBtn');
-        updateBtn.innerHTML = originalText;
-        updateBtn.disabled = false;
-    }
-}
-
-// 点击侧拉窗遮罩关闭
-window.onclick = function(event) {
-    const overlay = document.getElementById('taskDetailSidebar');
-    if (event.target === overlay) {
-        closeTaskDetailSidebar();
-    }
-}
-
-// 页面卸载时关闭SSE连接
-window.addEventListener('beforeunload', () => {
-    if (eventSource) {
-        eventSource.close();
-    }
-});
+// 侧拉页相关的所有函数已移除，改为独立详情页
 
 // 全选/取消全选
 function toggleSelectAll() {

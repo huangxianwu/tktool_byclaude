@@ -55,6 +55,30 @@
         </div>
     </div>
 
+    <!-- 状态标签选项卡 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+        <div class="flex space-x-1" x-data="{ activeTab: 'active' }">
+            <button @click="activeTab = 'all'; filterWorkflows('all')" 
+                    :class="activeTab === 'all' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+                    class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200">
+                <i class="fas fa-list mr-2"></i>
+                全部工作流
+            </button>
+            <button @click="activeTab = 'active'; filterWorkflows('active')" 
+                    :class="activeTab === 'active' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+                    class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200">
+                <i class="fas fa-check-circle mr-2"></i>
+                活跃模板
+            </button>
+            <button @click="activeTab = 'inactive'; filterWorkflows('inactive')" 
+                    :class="activeTab === 'inactive' ? 'bg-primary text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'"
+                    class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200">
+                <i class="fas fa-pause-circle mr-2"></i>
+                不活跃模板
+            </button>
+        </div>
+    </div>
+
     <!-- 工作流表格 -->
     <div id="workflow-table-container" class="workflow-table-container">
         <div class="overflow-x-auto">
@@ -213,6 +237,15 @@
 </div>
 
 <script>
+// 当前状态过滤器 - 默认显示活跃模板
+let currentStatusFilter = 'active';
+
+// 状态过滤函数
+function filterWorkflows(status) {
+    currentStatusFilter = status;
+    loadWorkflows();
+}
+
 // 加载工作流列表
 async function loadWorkflows() {
     const loading = document.getElementById('loading');
@@ -224,7 +257,8 @@ async function loadWorkflows() {
     tableContainer.classList.add('hidden');
     
     try {
-        const response = await fetch('/api/workflows');
+        const url = currentStatusFilter === 'all' ? '/api/workflows' : `/api/workflows?status=${currentStatusFilter}`;
+        const response = await fetch(url);
         const workflows = await response.json();
         
         loading.classList.add('hidden');
@@ -235,6 +269,13 @@ async function loadWorkflows() {
         }
         
         tableContainer.classList.remove('hidden');
+        
+        // 更新统计信息
+        const totalCount = workflows.length;
+        const activeCount = workflows.filter(wf => wf.status === 'active').length;
+        
+        document.getElementById('total-count').textContent = totalCount;
+        document.getElementById('active-count').textContent = activeCount;
         
         const tbody = document.getElementById('workflow-list');
         tbody.innerHTML = workflows.map(wf => {
@@ -264,18 +305,26 @@ async function loadWorkflows() {
                         <span class="node-count">${nodeCount}</span>
                     </td>
                     <td>
-                        <span class="status-badge status-active">
-                            <i class="fas fa-circle"></i>
-                            活跃
-                        </span>
+                        ${wf.status === 'active' ? 
+                            '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-circle text-green-400 mr-1"></i>活跃</span>' : 
+                            '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"><i class="fas fa-pause-circle text-gray-400 mr-1"></i>不活跃</span>'
+                        }
                     </td>
                     <td>
                         <div class="datetime">${createdDate}</div>
                     </td>
                     <td>
                         <div class="workflow-actions">
+                            ${wf.status === 'active' ? 
+                                `<button class="btn btn-warning btn-sm" onclick="toggleWorkflowStatus('${workflowId}')" title="禁用工作流">
+                                    <i class="fas fa-pause"></i>
+                                </button>` : 
+                                `<button class="btn btn-success btn-sm" onclick="toggleWorkflowStatus('${workflowId}')" title="启用工作流">
+                                    <i class="fas fa-play"></i>
+                                </button>`
+                            }
                             <button class="btn btn-primary btn-sm" onclick="createTask('${workflowId}')" title="创建新任务">
-                                <i class="fas fa-play"></i>
+                                <i class="fas fa-plus"></i>
                             </button>
                             <button class="btn btn-secondary btn-sm" onclick="editWorkflow('${workflowId}')" title="编辑工作流">
                                 <i class="fas fa-edit"></i>
@@ -567,8 +616,32 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// 切换工作流状态
+async function toggleWorkflowStatus(workflowId) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}/toggle-status`, {
+            method: 'PATCH'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(`工作流已${result.workflow.status === 'active' ? '启用' : '禁用'}`);
+            loadWorkflows();
+        } else {
+            alert('状态切换失败');
+        }
+    } catch (error) {
+        console.error('切换工作流状态失败:', error);
+        alert('状态切换失败');
+    }
+}
+
 // 页面加载时初始化
-document.addEventListener('DOMContentLoaded', loadWorkflows);
+document.addEventListener('DOMContentLoaded', function() {
+    // 默认应用活跃模板过滤
+    currentStatusFilter = 'active';
+    loadWorkflows();
+});
 </script>
 
 <style>

@@ -16,11 +16,81 @@ class TaskController:
         self.queue_service = TaskQueueService()
         self.status_service = TaskStatusService()
     
-    def get_tasks_with_workflow_info(self):
-        """获取任务列表及工作流信息"""
+    def get_tasks_with_workflow_info(self, status=None, workflow_id=None, start_date=None, end_date=None, search=None, sort_by='created_at', sort_order='desc'):
+        """获取任务列表及工作流信息（支持筛选）"""
         try:
-            # 先查询所有任务
-            tasks = Task.query.all()
+            from datetime import datetime
+            from sqlalchemy import or_, and_
+            
+            # 构建查询条件
+            query = Task.query
+            
+            # 状态筛选
+            if status:
+                query = query.filter(Task.status == status.upper())
+            
+            # 工作流筛选
+            if workflow_id:
+                query = query.filter(Task.workflow_id == workflow_id)
+            
+            # 时间范围筛选
+            if start_date:
+                try:
+                    # 支持日期格式 YYYY-MM-DD
+                    if len(start_date) == 10:  # YYYY-MM-DD format
+                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    else:
+                        start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    query = query.filter(Task.created_at >= start_dt)
+                except (ValueError, TypeError):
+                    pass
+            
+            if end_date:
+                try:
+                    # 支持日期格式 YYYY-MM-DD，设置为当天结束时间
+                    if len(end_date) == 10:  # YYYY-MM-DD format
+                        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                        # 设置为当天的23:59:59
+                        end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+                    else:
+                        end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    query = query.filter(Task.created_at <= end_dt)
+                except (ValueError, TypeError):
+                    pass
+            
+            # 任务描述搜索
+            if search:
+                query = query.filter(or_(
+                    Task.task_description.ilike(f'%{search}%'),
+                    Task.task_id.ilike(f'%{search}%')
+                ))
+            
+            # 排序
+            if sort_by == 'created_at':
+                if sort_order == 'desc':
+                    query = query.order_by(Task.created_at.desc())
+                else:
+                    query = query.order_by(Task.created_at.asc())
+            elif sort_by == 'status':
+                if sort_order == 'desc':
+                    query = query.order_by(Task.status.desc())
+                else:
+                    query = query.order_by(Task.status.asc())
+            elif sort_by == 'task_id':
+                if sort_order == 'desc':
+                    query = query.order_by(Task.task_id.desc())
+                else:
+                    query = query.order_by(Task.task_id.asc())
+            elif sort_by == 'workflow_id':
+                if sort_order == 'desc':
+                    query = query.order_by(Task.workflow_id.desc())
+                else:
+                    query = query.order_by(Task.workflow_id.asc())
+            else:
+                # 默认按创建时间降序排序
+                query = query.order_by(Task.created_at.desc())
+            
+            tasks = query.all()
             result = []
             
             for task in tasks:

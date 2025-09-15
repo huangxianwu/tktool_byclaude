@@ -29,12 +29,16 @@
             <label for="taskDescription" class="block text-sm font-medium text-gray-700 mb-2">
                 任务描述 (可选)
             </label>
-            <textarea id="taskDescription" 
-                      name="task_description" 
-                      placeholder="请输入任务描述，用于在任务列表中区分不同任务" 
-                      rows="3" 
-                      maxlength="500"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200 resize-none"></textarea>
+            <div class="relative">
+                <textarea id="taskDescription" 
+                          name="task_description" 
+                          placeholder="请输入任务描述，用于在任务列表中区分不同任务" 
+                          rows="3" 
+                          maxlength="500"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200 resize-none history-input" 
+                          data-history-key="task_description"></textarea>
+                <div class="history-dropdown hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto"></div>
+            </div>
             <p class="text-sm text-gray-500 mt-1">最多500字符，用于任务管理和识别</p>
         </div>
         
@@ -69,6 +73,78 @@
     </form>
 </div>
 
+<style>
+/* 自适应宽高比样式 */
+.aspect-w-16 {
+    position: relative;
+    width: 100%;
+}
+.aspect-w-16.aspect-h-9 {
+    padding-bottom: 56.25%; /* 16:9 = 9/16 = 0.5625 */
+}
+.aspect-w-16.aspect-h-9 > * {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* 预览容器优化 - 减小宽度但保持足够高度 */
+.image-preview, .video-preview {
+    max-width: 280px;
+    margin: 0 auto;
+}
+
+/* 调整宽高比为更紧凑的显示 */
+.image-preview .aspect-w-16.aspect-h-9,
+.video-preview .aspect-w-16.aspect-h-9 {
+    padding-bottom: 65%; /* 调整为更合适的比例，确保内容完整显示 */
+}
+
+/* 确保图片和视频在容器内完整显示 */
+.image-preview img,
+.video-preview video {
+    object-fit: contain; /* 保持完整画面，不裁剪 */
+    object-position: center;
+}
+
+/* 悬停效果优化 */
+.image-preview:hover .hover\:scale-105,
+.video-preview:hover .hover\:scale-105 {
+    transform: scale(1.02);
+}
+
+/* 响应式优化 */
+@media (max-width: 640px) {
+    .image-preview, .video-preview {
+        max-width: 100%;
+    }
+    .image-preview .aspect-w-16.aspect-h-9,
+    .video-preview .aspect-w-16.aspect-h-9 {
+        padding-bottom: 60%;
+    }
+}
+
+/* 历史记录下拉框样式 */
+.history-dropdown {
+    z-index: 1000;
+}
+
+.history-item {
+    transition: background-color 0.15s ease;
+}
+
+.history-item:hover,
+.history-item.active {
+    background-color: #f3f4f6;
+}
+
+.history-item.active {
+    background-color: #e5e7eb;
+}
+</style>
+
 <script>
 let workflowId = window.location.pathname.split('/').pop();
 let workflow = null;
@@ -96,7 +172,12 @@ function renderFormFields() {
         
         switch(node.node_type) {
             case 'text':
-                inputHtml = `<input type="text" name="${node.node_id}" placeholder="请输入${node.node_name}" required class="${inputClasses}">`;
+                inputHtml = `
+                    <div class="relative">
+                        <input type="text" name="${node.node_id}" placeholder="请输入${node.node_name}" required class="${inputClasses} history-input" data-history-key="text_${node.node_id}">
+                        <div class="history-dropdown hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto"></div>
+                    </div>
+                `;
                 break;
             case 'number':
                 inputHtml = `<input type="number" name="${node.node_id}" placeholder="请输入${node.node_name}" required class="${inputClasses}">`;
@@ -107,8 +188,13 @@ function renderFormFields() {
                         <input type="file" name="${node.node_id}" accept="image/*" required 
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
                         <div class="image-preview hidden" id="preview-${node.node_id}">
-                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                <img src="" alt="预览图" class="max-w-full h-auto max-h-48 rounded-lg shadow-sm">
+                            <div class="relative bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300">
+                                <div class="aspect-w-16 aspect-h-9 bg-gray-100 rounded-lg overflow-hidden">
+                                    <img src="" alt="预览图" class="w-full h-full object-contain transition-transform duration-300 hover:scale-105">
+                                </div>
+                                <div class="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded-md text-xs">
+                                    <i class="fas fa-image mr-1"></i>图片预览
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -120,10 +206,16 @@ function renderFormFields() {
                         <input type="file" name="${node.node_id}" accept="video/*" required 
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
                         <div class="video-preview hidden" id="preview-${node.node_id}">
-                            <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                <video controls class="max-w-full h-auto max-h-48 rounded-lg shadow-sm">
-                                    <source src="" type="video/mp4">
-                                </video>
+                            <div class="relative bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300">
+                                <div class="aspect-w-16 aspect-h-9 bg-gray-900 rounded-lg overflow-hidden">
+                                    <video controls preload="metadata" class="w-full h-full object-contain rounded-lg">
+                                        <source src="" type="video/mp4">
+                                        您的浏览器不支持视频播放。
+                                    </video>
+                                </div>
+                                <div class="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs">
+                                    <i class="fas fa-video mr-1"></i>视频预览
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -153,6 +245,9 @@ function renderFormFields() {
     
     // 添加文件预览功能
     addFilePreviewListeners();
+    
+    // 添加历史记录功能
+    addHistoryInputListeners();
 }
 
 // 添加文件预览监听器
@@ -182,6 +277,165 @@ function addFilePreviewListeners() {
                 preview.classList.remove('hidden');
             }
         });
+    });
+}
+
+// 历史记录管理功能
+class HistoryManager {
+    constructor() {
+        this.maxHistoryItems = 10;
+    }
+    
+    // 获取历史记录
+    getHistory(key) {
+        const history = localStorage.getItem(`history_${key}`);
+        return history ? JSON.parse(history) : [];
+    }
+    
+    // 保存历史记录
+    saveHistory(key, value) {
+        if (!value || value.trim() === '') return;
+        
+        let history = this.getHistory(key);
+        
+        // 移除重复项
+        history = history.filter(item => item !== value.trim());
+        
+        // 添加到开头
+        history.unshift(value.trim());
+        
+        // 限制数量
+        if (history.length > this.maxHistoryItems) {
+            history = history.slice(0, this.maxHistoryItems);
+        }
+        
+        localStorage.setItem(`history_${key}`, JSON.stringify(history));
+    }
+    
+    // 模糊匹配历史记录
+    filterHistory(key, query) {
+        const history = this.getHistory(key);
+        if (!query) return history;
+        
+        return history.filter(item => 
+            item.toLowerCase().includes(query.toLowerCase())
+        );
+    }
+}
+
+const historyManager = new HistoryManager();
+
+// 添加历史记录输入监听器
+function addHistoryInputListeners() {
+    document.querySelectorAll('.history-input').forEach(input => {
+        const historyKey = input.dataset.historyKey;
+        const dropdown = input.parentElement.querySelector('.history-dropdown');
+        
+        // 聚焦时显示历史记录
+        input.addEventListener('focus', function() {
+            showHistoryDropdown(this, dropdown, historyKey);
+        });
+        
+        // 输入时过滤历史记录
+        input.addEventListener('input', function() {
+            showHistoryDropdown(this, dropdown, historyKey, this.value);
+        });
+        
+        // 失焦时隐藏下拉框（延迟以允许点击选择）
+        input.addEventListener('blur', function() {
+            setTimeout(() => {
+                dropdown.classList.add('hidden');
+            }, 200);
+        });
+        
+        // 键盘导航
+        input.addEventListener('keydown', function(e) {
+            const items = dropdown.querySelectorAll('.history-item');
+            const activeItem = dropdown.querySelector('.history-item.active');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (activeItem) {
+                    activeItem.classList.remove('active');
+                    const next = activeItem.nextElementSibling;
+                    if (next) {
+                        next.classList.add('active');
+                    } else {
+                        items[0]?.classList.add('active');
+                    }
+                } else {
+                    items[0]?.classList.add('active');
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (activeItem) {
+                    activeItem.classList.remove('active');
+                    const prev = activeItem.previousElementSibling;
+                    if (prev) {
+                        prev.classList.add('active');
+                    } else {
+                        items[items.length - 1]?.classList.add('active');
+                    }
+                } else {
+                    items[items.length - 1]?.classList.add('active');
+                }
+            } else if (e.key === 'Enter' && activeItem) {
+                e.preventDefault();
+                this.value = activeItem.textContent;
+                dropdown.classList.add('hidden');
+            } else if (e.key === 'Escape') {
+                dropdown.classList.add('hidden');
+            }
+        });
+    });
+}
+
+// 显示历史记录下拉框
+function showHistoryDropdown(input, dropdown, historyKey, query = '') {
+    const history = historyManager.filterHistory(historyKey, query);
+    
+    if (history.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    dropdown.innerHTML = history.map(item => `
+        <div class="history-item px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-100 last:border-b-0" 
+             onclick="selectHistoryItem(this, '${historyKey}')">
+            ${escapeHtml(item)}
+        </div>
+    `).join('');
+    
+    dropdown.classList.remove('hidden');
+}
+
+// 选择历史记录项
+function selectHistoryItem(element, historyKey) {
+    const input = element.closest('.relative').querySelector('.history-input');
+    const dropdown = element.closest('.history-dropdown');
+    
+    input.value = element.textContent;
+    dropdown.classList.add('hidden');
+    input.focus();
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 保存表单历史记录
+function saveFormHistory(formData) {
+    // 保存文本输入框的历史记录
+    document.querySelectorAll('.history-input').forEach(input => {
+        const historyKey = input.dataset.historyKey;
+        const value = input.value;
+        
+        if (value && value.trim() !== '') {
+            historyManager.saveHistory(historyKey, value.trim());
+        }
     });
 }
 
@@ -266,8 +520,15 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
         
         if (response.ok) {
             const task = await response.json();
-            alert('任务创建成功！');
-            window.location.href = `/tasks/${task.task_id}`;
+            
+            // 保存历史记录
+            saveFormHistory(formData);
+            
+            showSuccessNotification(`任务创建成功！任务ID: ${task.task_id}`, task.task_id);
+            // 重置表单
+            document.getElementById('taskForm').reset();
+            // 重新渲染表单字段以清空文件预览
+            renderFormFields();
         } else {
             const error = await response.json();
             alert(`创建任务失败: ${error.error || '未知错误'}`);
@@ -289,6 +550,49 @@ function fileToBase64(file) {
         reader.onerror = error => reject(error);
         reader.readAsDataURL(file);
     });
+}
+
+// 显示成功通知
+function showSuccessNotification(message, taskId) {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 z-50 bg-green-500 text-white p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 transform translate-x-full';
+    
+    notification.innerHTML = `
+        <div class="flex items-start space-x-3">
+            <i class="fas fa-check-circle text-xl mt-0.5"></i>
+            <div class="flex-1">
+                <div class="font-medium">${message}</div>
+                <div class="mt-2 flex space-x-2">
+                    <button onclick="window.location.href='/tasks/${taskId}'" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-sm transition-colors duration-200">
+                        查看任务
+                    </button>
+                    <button onclick="this.closest('.fixed').remove()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-sm transition-colors duration-200">
+                        关闭
+                    </button>
+                </div>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 显示动画
+    setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // 自动隐藏
+    setTimeout(() => {
+        notification.classList.add('translate-x-full');
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 300);
+    }, 8000);
 }
 
 // 页面加载时初始化

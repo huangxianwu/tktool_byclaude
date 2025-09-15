@@ -68,6 +68,85 @@
         </div>
     </div>
 
+    <!-- 筛选功能区域 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <!-- 基础筛选 -->
+            <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">状态:</label>
+                    <select id="status-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="">全部状态</option>
+                        <option value="PENDING">等待中</option>
+                        <option value="RUNNING">运行中</option>
+                        <option value="SUCCESS">成功</option>
+                        <option value="FAILED">失败</option>
+                        <option value="STOPPED">已停止</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">工作流:</label>
+                    <select id="workflow-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="">全部工作流</option>
+                        <!-- 动态加载工作流选项 -->
+                    </select>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">时间范围:</label>
+                    <select id="time-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="">全部时间</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- 搜索和排序 -->
+            <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">排序:</label>
+                    <select id="sort-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="created_at_desc">最新创建</option>
+                        <option value="created_at_asc">最早创建</option>
+                        <option value="updated_at_desc">最近更新</option>
+                        <option value="status_asc">状态排序</option>
+                    </select>
+                </div>
+                
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="搜索任务描述..." 
+                           class="pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary w-full sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <button id="reset-filters" class="inline-flex items-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-undo mr-2"></i>
+                    重置
+                </button>
+            </div>
+        </div>
+        
+        <!-- 自定义时间范围 -->
+        <div id="custom-date-range" class="mt-4 pt-4 border-t border-gray-200 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">开始时间:</label>
+                    <input type="datetime-local" id="start-date" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">结束时间:</label>
+                    <input type="datetime-local" id="end-date" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 批量操作控制 -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">

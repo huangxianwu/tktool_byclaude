@@ -1,4 +1,4 @@
-# RunningHub 工作流自动化平台
+# ComfyUI 工作流自动化平台
 
 基于 Flask 构建的工作流自动化执行平台，集成 RunningHub AI 服务。
 

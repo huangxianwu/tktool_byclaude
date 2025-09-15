@@ -30,10 +30,19 @@ def queue():
 def task_detail(task_id):
     return render_template('task_detail.html')
 
+@bp.route('/task_detail/<task_id>')
+def task_detail_page(task_id):
+    return render_template('task_detail.html')
+
 @bp.route('/workflows/edit/<workflow_id>')
 def edit_workflow(workflow_id):
     workflow = Workflow.query.get_or_404(workflow_id)
     return render_template('edit_workflow.html', workflow=workflow.to_dict())
+
+@bp.route('/file-test')
+def file_test():
+    """文件显示测试页面"""
+    return render_template('file_test.html')
 
 @bp.route('/static/outputs/<path:filename>')
 def serve_output_file(filename):

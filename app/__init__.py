@@ -78,8 +78,12 @@ def create_app(config_class=Config):
                         # 检查超时任务
                         task_queue_service.check_timeout_tasks()
                         
-                        # 处理队列
-                        task_queue_service.process_queue()
+                        # 通过中央管理器处理队列
+                        from app.services.central_queue_manager import central_queue_manager, TriggerSource
+                        central_queue_manager.request_queue_processing(
+                            trigger_source=TriggerSource.BACKGROUND,
+                            reason="Background periodic check"
+                        )
                         
                         # 广播系统状态更新
                         status_monitor.broadcast_system_status()
@@ -115,10 +119,17 @@ def create_app(config_class=Config):
     def delayed_recovery():
         with app.app_context():
             try:
-                from app.services.recovery_service import recovery_service
+                from app.services.recovery_service import get_recovery_service
+                recovery_service = get_recovery_service()
                 print("🔄 Starting system recovery...")
                 recovery_stats = recovery_service.perform_recovery(delay_seconds=3)
                 print(f"✅ System recovery completed: {recovery_stats}")
+                
+                # 额外执行文件完整性恢复
+                print("📁 Starting file integrity recovery...")
+                file_recovery_stats = recovery_service.batch_restore_files()
+                print(f"✅ File integrity recovery completed: {file_recovery_stats}")
+                
             except Exception as e:
                 print(f"❌ System recovery failed: {e}")
     

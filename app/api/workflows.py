@@ -8,7 +8,13 @@ bp = Blueprint('workflows', __name__, url_prefix='/api/workflows')
 @bp.route('', methods=['GET'])
 def get_workflows():
     """获取所有工作流模板"""
-    workflows = Workflow.query.all()
+    status_filter = request.args.get('status')
+    
+    if status_filter and status_filter in ['active', 'inactive']:
+        workflows = Workflow.query.filter_by(status=status_filter).all()
+    else:
+        workflows = Workflow.query.all()
+    
     return jsonify([wf.to_dict() for wf in workflows])
 
 @bp.route('', methods=['POST'])
@@ -65,6 +71,9 @@ def update_workflow(workflow_id):
     if 'name' in data:
         workflow.name = data['name']
     
+    if 'status' in data:
+        workflow.status = data['status']
+    
     # 更新节点
     if 'nodes' in data:
         # 删除现有节点
@@ -97,3 +106,17 @@ def delete_workflow(workflow_id):
     db.session.commit()
     
     return jsonify({'message': 'Workflow deleted'})
+
+@bp.route('/<workflow_id>/toggle-status', methods=['PATCH'])
+def toggle_workflow_status(workflow_id):
+    """切换工作流状态"""
+    workflow = Workflow.query.get_or_404(workflow_id)
+    
+    # 切换状态
+    workflow.status = 'inactive' if workflow.status == 'active' else 'active'
+    db.session.commit()
+    
+    return jsonify({
+        'message': f'Workflow status changed to {workflow.status}',
+        'workflow': workflow.to_dict()
+    })

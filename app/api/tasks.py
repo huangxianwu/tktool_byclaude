@@ -12,7 +12,24 @@ task_controller = TaskController()
 @bp.route('', methods=['GET'])
 def get_tasks():
     """获取所有任务（包含工作流信息）"""
-    tasks = task_controller.get_tasks_with_workflow_info()
+    # 获取筛选参数
+    status = request.args.get('status')
+    workflow_id = request.args.get('workflow_id')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    search = request.args.get('search')
+    sort_by = request.args.get('sort_by', 'created_at')
+    sort_order = request.args.get('sort_order', 'desc')
+    
+    tasks = task_controller.get_tasks_with_workflow_info(
+        status=status,
+        workflow_id=workflow_id,
+        start_date=start_date,
+        end_date=end_date,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
     return jsonify(tasks)
 
 @bp.route('', methods=['POST'])

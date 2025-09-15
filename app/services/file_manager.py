@@ -96,11 +96,11 @@ class FileManager:
         
         # 根据文件类型选择目录
         if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
-            base_dir = os.path.join(self.base_dir, 'image', date_str)
+            base_dir = os.path.join(self.base_dir, 'images', date_str)
         elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv']:
-            base_dir = os.path.join(self.base_dir, 'video', date_str)
+            base_dir = os.path.join(self.base_dir, 'videos', date_str)
         else:
-            base_dir = os.path.join(self.base_dir, 'document', date_str)
+            base_dir = os.path.join(self.base_dir, 'documents', date_str)
         
         filename = f"task_{task_id}_node_{node_id}_output_{index}.{file_type}"
         return os.path.join(base_dir, filename)
@@ -112,11 +112,11 @@ class FileManager:
         
         # 根据文件类型选择目录
         if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
-            base_dir = os.path.join(self.base_dir, 'image', date_str)
+            base_dir = os.path.join(self.base_dir, 'images', date_str)
         elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv']:
-            base_dir = os.path.join(self.base_dir, 'video', date_str)
+            base_dir = os.path.join(self.base_dir, 'videos', date_str)
         else:
-            base_dir = os.path.join(self.base_dir, 'document', date_str)
+            base_dir = os.path.join(self.base_dir, 'documents', date_str)
         
         return os.path.join(base_dir, custom_filename)
     
@@ -126,7 +126,7 @@ class FileManager:
             now = datetime.now()
             date_str = now.strftime('%m%d')  # 格式如：0913
             
-            thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
+            thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', date_str)
             os.makedirs(thumbnail_dir, exist_ok=True)
             
             thumbnail_filename = f"task_{task_id}_node_{node_id}_output_{index}_thumb.jpg"
@@ -181,7 +181,7 @@ class FileManager:
             now = datetime.now()
             date_str = now.strftime('%m%d')  # 格式如：0913
             
-            thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
+            thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', date_str)
             os.makedirs(thumbnail_dir, exist_ok=True)
             
             # 从自定义文件名生成缩略图文件名
@@ -278,8 +278,8 @@ class FileManager:
         
         return result
     
-    def get_task_outputs_with_fallback(self, task_id):
-        """获取任务输出文件列表，如果没有本地记录则从RunningHub获取并补充字段"""
+    def get_task_outputs_with_fallback(self, task_id, auto_download=True):
+        """获取任务输出文件列表，如果没有本地记录则从RunningHub获取并自动下载"""
         # 先尝试获取本地记录
         local_outputs = self.get_task_outputs(task_id)
         if local_outputs:
@@ -289,7 +289,7 @@ class FileManager:
                 output['is_local'] = True
             return local_outputs
         
-        # 如果没有本地记录，从RunningHub获取并补充必要字段
+        # 如果没有本地记录，从RunningHub获取
         from app.models.Task import Task
         task = Task.query.get(task_id)
         if not task or not task.runninghub_task_id:
@@ -300,7 +300,40 @@ class FileManager:
             runninghub_service = RunningHubService()
             remote_outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
             
-            # 补充前端需要的字段
+            # 如果任务已成功完成且启用自动下载，则下载文件到本地
+            if auto_download and task.status == 'SUCCESS' and remote_outputs:
+                current_app.logger.info(f"Auto-downloading outputs for SUCCESS task {task_id}")
+                
+                # 转换为download_and_save_outputs期望的格式
+                formatted_outputs = []
+                for i, output in enumerate(remote_outputs):
+                    file_url = output.get('url', '')
+                    file_name = output.get('name', 'output.file')
+                    file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'png'
+                    
+                    formatted_outputs.append({
+                        'fileUrl': file_url,
+                        'fileType': file_extension,
+                        'nodeId': f'node_{i}'
+                    })
+                
+                # 下载并保存文件
+                try:
+                    saved_files = self.download_and_save_outputs(task_id, formatted_outputs)
+                    if saved_files:
+                        current_app.logger.info(f"Successfully downloaded {len(saved_files)} files for task {task_id}")
+                        # 重新获取本地记录
+                        local_outputs = self.get_task_outputs(task_id)
+                        if local_outputs:
+                            for output in local_outputs:
+                                output['source'] = 'local'
+                                output['is_local'] = True
+                            return local_outputs
+                except Exception as download_error:
+                    current_app.logger.error(f"Failed to download outputs for task {task_id}: {download_error}")
+                    # 下载失败，继续返回远程文件信息
+            
+            # 补充前端需要的字段（用于显示远程文件或下载失败时的备用方案）
             result = []
             for i, output in enumerate(remote_outputs):
                 # 从URL推断文件类型
@@ -477,7 +510,7 @@ class FileManager:
                 # 生成缩略图路径（使用日期分类，与其他方法保持一致）
                 now = datetime.now()
                 date_str = now.strftime('%m%d')  # 格式如：0913
-                thumbnail_dir = os.path.join(self.base_dir, 'image', 'thumbnails', date_str)
+                thumbnail_dir = os.path.join(self.base_dir, 'images', 'thumbnails', date_str)
                 os.makedirs(thumbnail_dir, exist_ok=True)
                 
                 filename = os.path.basename(image_path)

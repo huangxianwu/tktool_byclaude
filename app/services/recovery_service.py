@@ -2,6 +2,7 @@
 负责系统重启后的任务状态同步和数据完整性恢复
 """
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -67,7 +68,10 @@ class RecoveryService:
             # 4. 恢复数据完整性
             self._restore_data_integrity(tasks_to_sync, status_results)
             
-            # 5. 重建并发控制
+            # 5. 恢复输出文件完整性
+            self._restore_output_files_integrity()
+            
+            # 6. 重建并发控制
             self._rebuild_concurrency_control()
             
             self.recovery_stats['end_time'] = datetime.utcnow()
@@ -382,6 +386,170 @@ class RecoveryService:
         except Exception as e:
             logger.error(f"Failed to manually sync task {task_id}: {e}")
             return False
+    
+    def _restore_output_files_integrity(self):
+        """恢复输出文件完整性 - 检查所有SUCCESS任务的文件完整性"""
+        try:
+            logger.info("Starting output files integrity restoration...")
+            
+            # 查找所有SUCCESS状态的任务
+            success_tasks = Task.query.filter_by(status='SUCCESS').all()
+            
+            if not success_tasks:
+                logger.info("No SUCCESS tasks found for file integrity check")
+                return
+            
+            logger.info(f"Found {len(success_tasks)} SUCCESS tasks to check")
+            
+            restored_count = 0
+            failed_count = 0
+            
+            for task in success_tasks:
+                try:
+                    # 检查任务是否有本地输出文件
+                    local_outputs = TaskOutput.query.filter_by(task_id=task.task_id).all()
+                    
+                    if not local_outputs:
+                        # 没有本地文件记录，尝试恢复
+                        logger.info(f"Task {task.task_id} has no local output files, attempting recovery...")
+                        
+                        if self._restore_task_outputs(task):
+                            restored_count += 1
+                            logger.info(f"Successfully restored outputs for task {task.task_id}")
+                        else:
+                            failed_count += 1
+                            logger.warning(f"Failed to restore outputs for task {task.task_id}")
+                    else:
+                        # 检查本地文件是否存在
+                        missing_files = []
+                        for output in local_outputs:
+                            if not os.path.exists(output.local_path):
+                                missing_files.append(output)
+                        
+                        if missing_files:
+                            logger.info(f"Task {task.task_id} has {len(missing_files)} missing local files, attempting recovery...")
+                            
+                            # 删除缺失文件的数据库记录
+                            for missing_output in missing_files:
+                                db.session.delete(missing_output)
+                            db.session.commit()
+                            
+                            # 重新下载文件
+                            if self._restore_task_outputs(task):
+                                restored_count += 1
+                                logger.info(f"Successfully restored missing files for task {task.task_id}")
+                            else:
+                                failed_count += 1
+                                logger.warning(f"Failed to restore missing files for task {task.task_id}")
+                
+                except Exception as e:
+                    logger.error(f"Error checking task {task.task_id}: {e}")
+                    failed_count += 1
+                
+                # 避免请求过于频繁
+                time.sleep(0.1)
+            
+            logger.info(f"Output files integrity restoration completed: {restored_count} restored, {failed_count} failed")
+            
+        except Exception as e:
+            logger.error(f"Failed to restore output files integrity: {e}")
+    
+    def _restore_task_outputs(self, task: Task) -> bool:
+        """恢复单个任务的输出文件"""
+        try:
+            if not task.runninghub_task_id:
+                logger.warning(f"Task {task.task_id} has no RunningHub task ID")
+                return False
+            
+            # 从RunningHub获取输出文件信息
+            remote_outputs = self.runninghub_service.get_task_outputs(task.runninghub_task_id)
+            
+            if not remote_outputs:
+                logger.info(f"No remote outputs found for task {task.task_id}")
+                return True  # 没有输出文件也算成功
+            
+            # 使用FileManager下载文件
+            formatted_outputs = []
+            for i, output in enumerate(remote_outputs):
+                file_url = output.get('url', '')
+                file_name = output.get('name', 'output.file')
+                file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'png'
+                
+                formatted_outputs.append({
+                    'fileUrl': file_url,
+                    'fileType': file_extension,
+                    'nodeId': f'node_{i}'
+                })
+            
+            # 下载并保存文件
+            saved_files = self.file_manager.download_and_save_outputs(task.task_id, formatted_outputs)
+            
+            if saved_files:
+                logger.info(f"Successfully downloaded {len(saved_files)} files for task {task.task_id}")
+                return True
+            else:
+                logger.warning(f"No files were downloaded for task {task.task_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to restore outputs for task {task.task_id}: {e}")
+            return False
+    
+    def batch_restore_files(self, task_ids: List[str] = None) -> Dict[str, Any]:
+        """批量恢复文件 - 可指定任务ID列表或恢复所有SUCCESS任务"""
+        try:
+            if task_ids:
+                # 恢复指定任务
+                tasks = Task.query.filter(Task.task_id.in_(task_ids), Task.status == 'SUCCESS').all()
+            else:
+                # 恢复所有SUCCESS任务
+                tasks = Task.query.filter_by(status='SUCCESS').all()
+            
+            result = {
+                'total_tasks': len(tasks),
+                'restored_tasks': 0,
+                'failed_tasks': 0,
+                'start_time': datetime.utcnow().isoformat(),
+                'details': []
+            }
+            
+            for task in tasks:
+                task_result = {
+                    'task_id': task.task_id,
+                    'status': 'success' if self._restore_task_outputs(task) else 'failed'
+                }
+                
+                if task_result['status'] == 'success':
+                    result['restored_tasks'] += 1
+                else:
+                    result['failed_tasks'] += 1
+                
+                result['details'].append(task_result)
+                
+                # 避免请求过于频繁
+                time.sleep(0.1)
+            
+            result['end_time'] = datetime.utcnow().isoformat()
+            
+            logger.info(f"Batch file restoration completed: {result['restored_tasks']}/{result['total_tasks']} tasks restored")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Batch file restoration failed: {e}")
+            return {
+                'error': str(e),
+                'total_tasks': 0,
+                'restored_tasks': 0,
+                'failed_tasks': 0
+            }
 
-# 全局恢复服务实例
-recovery_service = RecoveryService()
+# 全局恢复服务实例（延迟初始化）
+recovery_service = None
+
+def get_recovery_service():
+    """获取恢复服务实例（延迟初始化）"""
+    global recovery_service
+    if recovery_service is None:
+        recovery_service = RecoveryService()
+    return recovery_service
