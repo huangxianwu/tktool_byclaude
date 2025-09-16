@@ -92,7 +92,7 @@
                             工作流ID
                         </th>
                         <th>
-                            描述
+                            关联任务数
                         </th>
                         <th>
                             节点数
@@ -282,7 +282,7 @@ async function loadWorkflows() {
             const nodeCount = wf.nodes ? wf.nodes.length : 0;
             const createdDate = new Date(wf.created_at).toLocaleString('zh-CN');
             const workflowId = wf.workflow_id || wf.id;
-            const description = wf.description || '包含 ' + nodeCount + ' 个处理节点的自动化工作流';
+            const taskCount = wf.task_count || 0;
             
             return `
                 <tr>
@@ -297,8 +297,11 @@ async function loadWorkflows() {
                         </div>
                     </td>
                     <td>
-                        <div class="workflow-description">
-                            ${description}
+                        <div class="task-count">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                <i class="fas fa-tasks mr-1"></i>
+                                ${taskCount} 个任务
+                            </span>
                         </div>
                     </td>
                     <td>
@@ -391,11 +394,13 @@ function addNode() {
         <div class="node-form">
             <input type="text" placeholder="节点ID (可选)" name="node_id">
             <input type="text" placeholder="节点名称" name="node_name" required>
-            <select name="node_type" required>
-                <option value="text">文本</option>
-                <option value="number">数字</option>
-                <option value="image">图片</option>
-                <option value="video">视频</option>
+            <select name="node_type" class="form-control" required>
+                                        <option value="">选择节点类型</option>
+                                        <option value="text">文本</option>
+                                        <option value="number">数字</option>
+                                        <option value="image">图片</option>
+                                        <option value="video">视频</option>
+                                        <option value="audio">音频</option>
             </select>
             <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.node-item').remove()">删除</button>
         </div>

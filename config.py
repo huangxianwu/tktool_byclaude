@@ -21,3 +21,11 @@ class Config:
     MAX_CONCURRENT_TASKS = 1  # 最大并发任务数
     TASK_TIMEOUT_MINUTES = 600  # 任务超时时间(分钟)
     STATUS_CHECK_INTERVAL = 10  # 状态检查间隔（秒）
+    
+    # 远程模式配置
+    REMOTE_ONLY_MODE = True  # 纯远程模式，禁用本地文件下载和存储
+    
+    # 以下配置项已移除（远程模式下不需要）：
+    # SHOW_REMOTE_FILES_ONLY = True  # 默认只显示远程文件
+    # AUTO_DOWNLOAD_ON_SUCCESS = False  # 任务成功后是否自动下载文件到本地
+    # ENABLE_LOCAL_FILE_STORAGE = False  # 禁用本地存储

@@ -56,6 +56,63 @@ class RunningHubService:
                 self._log(task_id, f"❌ 文件上传异常: {str(e)}")
             raise
     
+    def upload_audio_file(self, file_data, filename, task_id=None):
+        """专门用于上传音频文件到RunningHub"""
+        self._ensure_config()
+        try:
+            # 验证音频文件格式
+            allowed_audio_formats = ['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg']
+            file_ext = filename.lower().split('.')[-1] if '.' in filename else ''
+            if f'.{file_ext}' not in allowed_audio_formats:
+                error_msg = f"不支持的音频格式: {file_ext}. 支持的格式: {', '.join(allowed_audio_formats)}"
+                if task_id:
+                    self._log(task_id, f"❌ {error_msg}")
+                raise Exception(error_msg)
+            
+            # 验证文件大小 (限制为100MB)
+            max_size = 100 * 1024 * 1024  # 100MB
+            if len(file_data) > max_size:
+                error_msg = f"音频文件过大: {len(file_data)} bytes. 最大允许: {max_size} bytes"
+                if task_id:
+                    self._log(task_id, f"❌ {error_msg}")
+                raise Exception(error_msg)
+            
+            files = {'file': (filename, file_data)}
+            data = {'apiKey': self.api_key}
+            
+            # 记录音频上传请求详情
+            if task_id:
+                self._log(task_id, f"🎵 准备上传音频文件: {filename}, 大小: {len(file_data)} bytes")
+                self._log(task_id, f"🎵 音频格式: {file_ext}, 上传到: {self.base_url}/upload")
+            
+            response = requests.post(f"{self.base_url}/upload", data=data, files=files)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('code') == 0:
+                    file_name = result['data']['fileName']
+                    
+                    # 记录音频上传成功日志
+                    if task_id:
+                        self._log(task_id, f"🎵 音频文件上传成功 → fileName={file_name}")
+                    
+                    return file_name
+                else:
+                    error_msg = result.get('msg', 'Unknown error')
+                    if task_id:
+                        self._log(task_id, f"❌ 音频文件上传失败: {error_msg}")
+                    raise Exception(f"Audio upload failed: {error_msg}")
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                if task_id:
+                    self._log(task_id, f"❌ 音频上传HTTP错误: {error_msg}")
+                raise Exception(f"Audio upload HTTP error: {error_msg}")
+                
+        except Exception as e:
+            if task_id:
+                    self._log(task_id, f"❌ 音频上传异常: {str(e)}")
+            raise e
+    
     def run_task(self, node_info_list, task_id, workflow_id, is_plus=False):
         """运行任务"""
         self._ensure_config()
@@ -87,8 +144,11 @@ class RunningHubService:
                 request_data["instanceType"] = "plus"
                 self._log(task_id, "⚡ 使用Plus实例 (48G显存机器)")
             
-            self._log(task_id, "🚀 准备调用 create，完整请求参数：")
-            self._log(task_id, json.dumps(request_data, ensure_ascii=False, indent=2))
+            self._log(task_id, "🚀 准备调用 create，请求参数概要：")
+            # 使用日志脱敏工具创建安全的请求参数副本
+            from app.utils.log_sanitizer import LogSanitizer
+            safe_request_data = LogSanitizer.create_safe_request_data(request_data)
+            self._log(task_id, json.dumps(safe_request_data, ensure_ascii=False, indent=2))
             
             # 发起API请求 - 使用创建任务接口
             self._log(task_id, f"📡 发起POST请求到: `{self.base_url}/create`")
@@ -104,12 +164,26 @@ class RunningHubService:
             
             try:
                 response_text = response.text
-                self._log(task_id, f"📡 响应原始内容: {response_text}")
+                # 限制响应内容长度，避免输出过长的数据
+                if len(response_text) > 1000:
+                    self._log(task_id, f"📡 响应原始内容: {response_text[:500]}...(长度:{len(response_text)}字符,已截断)")
+                else:
+                    self._log(task_id, f"📡 响应原始内容: {response_text}")
                 result = response.json()
-                self._log(task_id, f"📡 响应JSON解析: {json.dumps(result, ensure_ascii=False, indent=2)}")
+                # 限制JSON响应长度
+                result_str = json.dumps(result, ensure_ascii=False, indent=2)
+                if len(result_str) > 1000:
+                    self._log(task_id, f"📡 响应JSON解析: {result_str[:500]}...(长度:{len(result_str)}字符,已截断)")
+                else:
+                    self._log(task_id, f"📡 响应JSON解析: {result_str}")
             except Exception as parse_error:
                 self._log(task_id, f"❌ 响应JSON解析失败: {str(parse_error)}")
-                self._log(task_id, f"📡 响应原始文本: {response.text}")
+                # 限制原始响应文本长度
+                raw_text = response.text
+                if len(raw_text) > 500:
+                    self._log(task_id, f"📡 响应原始文本: {raw_text[:250]}...(长度:{len(raw_text)}字符,已截断)")
+                else:
+                    self._log(task_id, f"📡 响应原始文本: {raw_text}")
                 raise Exception(f"Response parsing failed: {str(parse_error)}")
             
             if response.status_code == 200:
@@ -134,7 +208,12 @@ class RunningHubService:
                     raise Exception(f"Run task failed: {error_msg}")
             else:
                 self._log(task_id, f"❌ 任务发起HTTP错误: {response.status_code}")
-                self._log(task_id, f"❌ HTTP错误详情: {response.text}")
+                # 限制HTTP错误详情长度
+                error_text = response.text
+                if len(error_text) > 500:
+                    self._log(task_id, f"❌ HTTP错误详情: {error_text[:250]}...(长度:{len(error_text)}字符,已截断)")
+                else:
+                    self._log(task_id, f"❌ HTTP错误详情: {error_text}")
                 raise Exception(f"HTTP error: {response.status_code}")
                 
         except Exception as e:
@@ -157,7 +236,12 @@ class RunningHubService:
             }
             
             self._log(task_id, f"📡 发起状态查询请求到: {self.base_url}/status")
-            self._log(task_id, f"📋 请求参数: {json.dumps(request_data, ensure_ascii=False)}")
+            # 安全地记录请求参数（隐藏完整API密钥）
+            safe_request_data = {
+                "apiKey": f"{self.api_key[:8]}...{self.api_key[-4:]}",
+                "taskId": runninghub_task_id
+            }
+            self._log(task_id, f"📋 请求参数: {json.dumps(safe_request_data, ensure_ascii=False)}")
             
             response = requests.post(
                 f"{self.base_url}/status",
@@ -170,10 +254,20 @@ class RunningHubService:
             if response.status_code == 200:
                 try:
                     result = response.json()
-                    self._log(task_id, f"📊 状态查询响应: {json.dumps(result, ensure_ascii=False)}")
+                    # 限制状态查询响应长度
+                    result_str = json.dumps(result, ensure_ascii=False)
+                    if len(result_str) > 1000:
+                        self._log(task_id, f"📊 状态查询响应: {result_str[:500]}...(长度:{len(result_str)}字符,已截断)")
+                    else:
+                        self._log(task_id, f"📊 状态查询响应: {result_str}")
                 except Exception as parse_error:
                     self._log(task_id, f"❌ 状态查询响应解析失败: {str(parse_error)}")
-                    self._log(task_id, f"📡 原始响应: {response.text}")
+                    # 限制原始响应长度
+                    raw_response = response.text
+                    if len(raw_response) > 500:
+                        self._log(task_id, f"📡 原始响应: {raw_response[:250]}...(长度:{len(raw_response)}字符,已截断)")
+                    else:
+                        self._log(task_id, f"📡 原始响应: {raw_response}")
                     return None
                 
                 if result.get('code') == 0:
@@ -201,7 +295,12 @@ class RunningHubService:
                     return None
             else:
                 self._log(task_id, f"❌ 状态查询HTTP错误: {response.status_code}")
-                self._log(task_id, f"❌ HTTP错误详情: {response.text}")
+                # 限制HTTP错误详情长度
+                error_text = response.text
+                if len(error_text) > 500:
+                    self._log(task_id, f"❌ HTTP错误详情: {error_text[:250]}...(长度:{len(error_text)}字符,已截断)")
+                else:
+                    self._log(task_id, f"❌ HTTP错误详情: {error_text}")
                 return None
                 
         except Exception as e:
@@ -384,7 +483,12 @@ class RunningHubService:
                     return current_task_counts
             
             if task_id:
-                self._log(task_id, f"❌ 查询账号状态失败: {response.text}")
+                # 限制账号状态查询错误详情长度
+                error_text = response.text
+                if len(error_text) > 500:
+                    self._log(task_id, f"❌ 查询账号状态失败: {error_text[:250]}...(长度:{len(error_text)}字符,已截断)")
+                else:
+                    self._log(task_id, f"❌ 查询账号状态失败: {error_text}")
             return None
             
         except Exception as e:

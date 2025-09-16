@@ -68,7 +68,7 @@ def create_app(config_class=Config):
             task_status_service.start_monitoring()
             
         except Exception as e:
-            print(f"Failed to start background tasks: {e}")
+            app.logger.error(f"Failed to start background tasks: {e}")
         
         def background_task_checker():
             """后台任务检查器 - 定期检查超时任务和处理队列"""
@@ -104,7 +104,7 @@ def create_app(config_class=Config):
                         time.sleep(30)
                         
                 except Exception as e:
-                    print(f"Background task checker error: {e}")
+                    app.logger.error(f"Background task checker error: {e}")
                     # 出错时等待更长时间
                     time.sleep(60)
         
@@ -115,25 +115,27 @@ def create_app(config_class=Config):
     # 延迟启动后台任务
     threading.Timer(2.0, start_background_tasks).start()
     
-    # 延迟执行系统故障恢复
-    def delayed_recovery():
-        with app.app_context():
-            try:
-                from app.services.recovery_service import get_recovery_service
-                recovery_service = get_recovery_service()
-                print("🔄 Starting system recovery...")
-                recovery_stats = recovery_service.perform_recovery(delay_seconds=3)
-                print(f"✅ System recovery completed: {recovery_stats}")
-                
-                # 额外执行文件完整性恢复
-                print("📁 Starting file integrity recovery...")
-                file_recovery_stats = recovery_service.batch_restore_files()
-                print(f"✅ File integrity recovery completed: {file_recovery_stats}")
-                
-            except Exception as e:
-                print(f"❌ System recovery failed: {e}")
+    # 禁用系统故障恢复逻辑（远程模式下不需要本地文件恢复）
+    # def delayed_recovery():
+    #     with app.app_context():
+    #         try:
+    #             from app.services.recovery_service import get_recovery_service
+    #             recovery_service = get_recovery_service()
+    #             print("🔄 Starting system recovery...")
+    #             recovery_stats = recovery_service.perform_recovery(delay_seconds=3)
+    #             print(f"✅ System recovery completed: {recovery_stats}")
+    #             
+    #             # 额外执行文件完整性恢复
+    #             print("📁 Starting file integrity recovery...")
+    #             file_recovery_stats = recovery_service.batch_restore_files()
+    #             print(f"✅ File integrity recovery completed: {file_recovery_stats}")
+    #             
+    #         except Exception as e:
+    #             print(f"❌ System recovery failed: {e}")
+    # 
+    # threading.Timer(5.0, delayed_recovery).start()
     
-    threading.Timer(5.0, delayed_recovery).start()
+    app.logger.info("File recovery disabled - running in remote-only mode")
     
     return app
 

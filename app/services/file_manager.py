@@ -12,17 +12,92 @@ import re
 
 class FileManager:
     def __init__(self):
-        self.base_dir = current_app.config.get('OUTPUT_FILES_DIR', 'outputs')
-        self.static_url_prefix = '/static/outputs'
-        
-        # 确保目录存在
-        os.makedirs(os.path.join(self.base_dir, 'images'), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, 'images', 'thumbnails'), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, 'videos'), exist_ok=True)
-        os.makedirs(os.path.join(self.base_dir, 'documents'), exist_ok=True)
+        # 在远程模式下，不需要本地目录
+        self.remote_only_mode = current_app.config.get('REMOTE_ONLY_MODE', False)
+        if not self.remote_only_mode:
+            self.base_dir = current_app.config.get('OUTPUT_FILES_DIR', 'outputs')
+            self.static_url_prefix = '/static/outputs'
+            # 确保目录存在
+            os.makedirs(os.path.join(self.base_dir, 'images'), exist_ok=True)
+            os.makedirs(os.path.join(self.base_dir, 'images', 'thumbnails'), exist_ok=True)
+            os.makedirs(os.path.join(self.base_dir, 'videos'), exist_ok=True)
+            os.makedirs(os.path.join(self.base_dir, 'documents'), exist_ok=True)
     
+    def get_remote_task_outputs(self, task_id):
+        """获取任务的远程输出文件列表（纯远程模式）"""
+        # 先尝试获取本地记录（仅获取远程URL信息）
+        local_outputs = TaskOutput.query.filter_by(task_id=task_id).all()
+        if local_outputs:
+            result = []
+            for output in local_outputs:
+                result.append({
+                    'name': output.name or f"output_{output.id}.{output.file_type}",
+                    'url': output.file_url,  # 直接使用远程URL
+                    'id': output.id,
+                    'node_id': output.node_id,
+                    'file_url': output.file_url,
+                    'file_type': output.file_type,
+                    'file_size': output.file_size,
+                    'source': 'remote',
+                    'is_local': False,
+                    'created_at': output.created_at.isoformat() if output.created_at else None
+                })
+            return result
+        
+        # 如果没有本地记录，从RunningHub获取
+        from app.models.Task import Task
+        task = Task.query.get(task_id)
+        if not task or not task.runninghub_task_id:
+            return []
+        
+        try:
+            from app.services.runninghub import RunningHubService
+            runninghub_service = RunningHubService()
+            remote_outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
+            
+            # 补充前端需要的字段（纯远程文件信息）
+            result = []
+            for i, output in enumerate(remote_outputs):
+                file_url = output.get('url', '')
+                file_name = output.get('name', f'output_{i}.file')
+                file_size = output.get('size', 0)
+                
+                # 从URL推断文件类型
+                file_extension = 'png'
+                if file_name and '.' in file_name:
+                    file_extension = file_name.split('.')[-1].lower()
+                elif file_url:
+                    parsed_url = urlparse(file_url)
+                    path = unquote(parsed_url.path)
+                    if '.' in path:
+                        file_extension = path.split('.')[-1].lower()
+                
+                result.append({
+                    'name': file_name,
+                    'url': file_url,
+                    'id': f'remote_{i}',
+                    'node_id': f'node_{i}',
+                    'file_url': file_url,
+                    'file_type': file_extension,
+                    'file_size': file_size,
+                    'source': 'remote',
+                    'is_local': False,
+                    'created_at': datetime.now().isoformat()
+                })
+            
+            return result
+            
+        except Exception as e:
+            current_app.logger.error(f"Error getting remote outputs for task {task_id}: {e}")
+            return []
+
     def download_and_save_outputs(self, task_id, outputs):
         """下载并保存任务输出文件"""
+        # 在远程模式下，跳过本地文件下载
+        if self.remote_only_mode:
+            current_app.logger.info(f"Skipping file download for task {task_id} - remote only mode enabled")
+            return []
+        
         saved_files = []
         
         for i, output in enumerate(outputs):
@@ -91,6 +166,10 @@ class FileManager:
     
     def _generate_local_path(self, task_id, file_type, index, node_id):
         """生成本地文件路径"""
+        # 在远程模式下，不生成本地路径
+        if self.remote_only_mode:
+            return ""
+            
         now = datetime.now()
         date_str = now.strftime('%m%d')  # 格式如：0913
         
@@ -107,6 +186,10 @@ class FileManager:
     
     def _generate_local_path_with_custom_name(self, task_id, custom_filename, file_type):
         """使用自定义文件名生成本地文件路径"""
+        # 在远程模式下，不生成本地路径
+        if self.remote_only_mode:
+            return ""
+            
         now = datetime.now()
         date_str = now.strftime('%m%d')  # 格式如：0913
         
@@ -243,9 +326,9 @@ class FileManager:
     
     def get_task_outputs(self, task_id):
         """获取任务的输出文件列表"""
-        print(f"DEBUG FileManager: Querying outputs for task_id: {task_id}")
+        current_app.logger.debug(f"Querying outputs for task_id: {task_id}")
         outputs = TaskOutput.query.filter_by(task_id=task_id).all()
-        print(f"DEBUG FileManager: Query returned {len(outputs)} outputs")
+        current_app.logger.debug(f"Query returned {len(outputs)} outputs")
         
         result = []
         for output in outputs:
@@ -279,7 +362,11 @@ class FileManager:
         return result
     
     def get_task_outputs_with_fallback(self, task_id, auto_download=True):
-        """获取任务输出文件列表，如果没有本地记录则从RunningHub获取并自动下载"""
+        """获取任务输出文件列表，远程模式下直接调用get_remote_task_outputs"""
+        if self.remote_only_mode:
+            return self.get_remote_task_outputs(task_id)
+        
+        # 传统模式保持不变（向后兼容）
         # 先尝试获取本地记录
         local_outputs = self.get_task_outputs(task_id)
         if local_outputs:
@@ -300,62 +387,38 @@ class FileManager:
             runninghub_service = RunningHubService()
             remote_outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
             
-            # 如果任务已成功完成且启用自动下载，则下载文件到本地
-            if auto_download and task.status == 'SUCCESS' and remote_outputs:
-                current_app.logger.info(f"Auto-downloading outputs for SUCCESS task {task_id}")
-                
-                # 转换为download_and_save_outputs期望的格式
-                formatted_outputs = []
-                for i, output in enumerate(remote_outputs):
-                    file_url = output.get('url', '')
-                    file_name = output.get('name', 'output.file')
-                    file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'png'
-                    
-                    formatted_outputs.append({
-                        'fileUrl': file_url,
-                        'fileType': file_extension,
-                        'nodeId': f'node_{i}'
-                    })
-                
-                # 下载并保存文件
-                try:
-                    saved_files = self.download_and_save_outputs(task_id, formatted_outputs)
-                    if saved_files:
-                        current_app.logger.info(f"Successfully downloaded {len(saved_files)} files for task {task_id}")
-                        # 重新获取本地记录
-                        local_outputs = self.get_task_outputs(task_id)
-                        if local_outputs:
-                            for output in local_outputs:
-                                output['source'] = 'local'
-                                output['is_local'] = True
-                            return local_outputs
-                except Exception as download_error:
-                    current_app.logger.error(f"Failed to download outputs for task {task_id}: {download_error}")
-                    # 下载失败，继续返回远程文件信息
-            
-            # 补充前端需要的字段（用于显示远程文件或下载失败时的备用方案）
+            # 补充前端需要的字段（用于显示远程文件）
             result = []
             for i, output in enumerate(remote_outputs):
-                # 从URL推断文件类型
                 file_url = output.get('url', '')
-                file_name = output.get('name', 'output.file')
-                file_extension = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+                file_name = output.get('name', f'output_{i}.file')
+                file_size = output.get('size', 0)
+                
+                # 从URL推断文件类型
+                file_extension = 'png'
+                if file_name and '.' in file_name:
+                    file_extension = file_name.split('.')[-1].lower()
+                elif file_url:
+                    parsed_url = urlparse(file_url)
+                    path = unquote(parsed_url.path)
+                    if '.' in path:
+                        file_extension = path.split('.')[-1].lower()
                 
                 result.append({
                     'name': file_name,
                     'url': file_url,
-                    'id': None,
+                    'id': f'remote_{i}',
                     'node_id': f'node_{i}',
                     'file_url': file_url,
                     'local_path': None,
                     'thumbnail_path': None,
                     'file_type': file_extension,
-                    'file_size': None,
-                    'static_url': file_url,  # 直接使用远程URL
-                    'thumbnail_url': file_url if file_extension.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'] else None,
-                    'created_at': None,
-                    'source': 'remote',  # 标识为远程文件
-                    'is_local': False    # 标识非本地文件
+                    'file_size': file_size,
+                    'static_url': None,
+                    'thumbnail_url': None,
+                    'source': 'remote',
+                    'is_local': False,
+                    'created_at': datetime.now().isoformat()
                 })
             
             return result
@@ -396,6 +459,11 @@ class FileManager:
     
     def save_output_file(self, task_id, file_name, file_url, file_type='file'):
         """保存单个输出文件"""
+        # 在远程模式下，跳过本地文件保存
+        if self.remote_only_mode:
+            current_app.logger.info(f"Skipping file save for task {task_id} - remote only mode enabled")
+            return None
+            
         try:
             if not file_url or not file_name:
                 return None

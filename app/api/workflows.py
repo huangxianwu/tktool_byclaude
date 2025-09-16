@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import Workflow, Node
+from app.models import Workflow, Node, Task
 import uuid
 
 bp = Blueprint('workflows', __name__, url_prefix='/api/workflows')
@@ -15,7 +15,16 @@ def get_workflows():
     else:
         workflows = Workflow.query.all()
     
-    return jsonify([wf.to_dict() for wf in workflows])
+    # 为每个工作流添加关联任务数量统计
+    result = []
+    for wf in workflows:
+        wf_dict = wf.to_dict()
+        # 统计该工作流的所有任务数量（不论状态）
+        task_count = Task.query.filter_by(workflow_id=wf.workflow_id).count()
+        wf_dict['task_count'] = task_count
+        result.append(wf_dict)
+    
+    return jsonify(result)
 
 @bp.route('', methods=['POST'])
 def create_workflow():

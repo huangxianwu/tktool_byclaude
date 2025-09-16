@@ -266,6 +266,11 @@ class TaskController:
     
     def download_task_files(self, task_id):
         """下载任务的所有输出文件到本地"""
+        # 检查是否为远程模式
+        remote_only_mode = current_app.config.get('REMOTE_ONLY_MODE', False)
+        if remote_only_mode:
+            return {'success': False, 'error': 'File download is disabled in remote-only mode'}
+        
         from app.services.file_manager import FileManager
         from app.services.runninghub import RunningHubService
         from app.models.Task import Task
@@ -350,12 +355,12 @@ class TaskController:
         """获取任务执行日志"""
         try:
             from app.models.TaskLog import TaskLog
-            logs = TaskLog.query.filter_by(task_id=task_id).order_by(TaskLog.timestamp.desc()).all()
+            logs = TaskLog.query.filter_by(task_id=task_id).order_by(TaskLog.timestamp.asc()).all()
             return [
                 {
                     'id': log.id,
                     'message': log.message,
-                    'created_at': log.timestamp.isoformat() if log.timestamp else None
+                    'timestamp': log.timestamp.isoformat() if log.timestamp else None
                 } for log in logs
             ]
         except Exception as e:

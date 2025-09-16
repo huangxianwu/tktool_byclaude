@@ -92,14 +92,16 @@ class TaskQueueManager:
                         if task_data:
                             task_data.file_url = output['fileUrl']
                     
-                    # 下载并保存文件到本地
-                    try:
-                        from app.services.file_manager import FileManager
-                        file_manager = FileManager()
-                        saved_files = file_manager.download_and_save_outputs(task_id, outputs)
-                        self.runninghub_service._log(task_id, f"✅ 已下载并保存{len(saved_files)}个输出文件到本地")
-                    except Exception as e:
-                        self.runninghub_service._log(task_id, f"⚠️ 文件下载失败: {str(e)}")
+                    # 禁用自动下载文件到本地的逻辑（远程模式下不需要）
+                    # try:
+                    #     from app.services.file_manager import FileManager
+                    #     file_manager = FileManager()
+                    #     saved_files = file_manager.download_and_save_outputs(task_id, outputs)
+                    #     self.runninghub_service._log(task_id, f"✅ 已下载并保存{len(saved_files)}个输出文件到本地")
+                    # except Exception as e:
+                    #     self.runninghub_service._log(task_id, f"⚠️ 文件下载失败: {str(e)}")
+                    
+                    self.runninghub_service._log(task_id, f"✅ 任务完成，输出文件已保存到远程服务器")
                     
                     # 更新任务状态为成功
                     task.status = 'SUCCESS'
@@ -158,7 +160,7 @@ class TaskQueueManager:
                     time.sleep(5)
                     
                 except Exception as e:
-                    print(f"Task monitor error: {e}")
+                    current_app.logger.error(f"Task monitor error: {e}")
                     time.sleep(10)
     
     def stop_all_tasks(self):

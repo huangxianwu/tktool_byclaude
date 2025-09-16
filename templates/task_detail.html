@@ -279,17 +279,54 @@
 
 
 <script>
-let taskId = window.location.pathname.split('/').pop();
+// 安全获取taskId，避免undefined问题
+function getTaskIdFromUrl() {
+    const pathParts = window.location.pathname.split('/').filter(part => part.length > 0);
+    const taskIdFromPath = pathParts[pathParts.length - 1];
+    
+    // 验证taskId是否有效
+    if (!taskIdFromPath || taskIdFromPath === 'undefined' || taskIdFromPath === 'null') {
+        console.error('Invalid taskId from URL:', taskIdFromPath);
+        // 尝试从URL参数获取
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskIdFromParam = urlParams.get('taskId') || urlParams.get('id');
+        if (taskIdFromParam) {
+            return taskIdFromParam;
+        }
+        // 如果都没有，显示错误
+        document.body.innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="text-center"><h1 class="text-2xl font-bold text-red-600 mb-4">错误：无效的任务ID</h1><p class="text-gray-600">请检查URL是否正确</p><a href="/tasks" class="mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">返回任务列表</a></div></div>';
+        return null;
+    }
+    
+    return taskIdFromPath;
+}
+
+let taskId = getTaskIdFromUrl();
 let eventSource = null;
+let currentTaskInfo = null; // 存储当前任务信息
 
 // 加载任务详情
 async function loadTaskDetail() {
+    // 如果taskId无效，直接返回
+    if (!taskId) {
+        return;
+    }
+    
     try {
+        // 显示加载状态
+        showLoadingState();
+        
         const response = await fetch(`/api/tasks/${taskId}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const task = await response.json();
+        
+        // 存储任务信息到全局变量
+        currentTaskInfo = task;
+        
+        // 隐藏加载状态
+        hideLoadingState();
         
         // 更新基本信息
         document.getElementById('taskId').textContent = task.task_id || task.id;
@@ -423,13 +460,16 @@ function createResultCard(output) {
     const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
     const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv|webm)$/);
     
+    // 统一获取文件URL，支持多种字段名
+    const fileUrl = output.static_url || output.url || output.file_url || '';
+    
     let cardContent = '';
     let previewContent = '';
     
     if (isImage) {
-        const thumbnailUrl = output.thumbnail_url || output.static_url;
+        const thumbnailUrl = output.thumbnail_url || fileUrl;
         previewContent = `
-            <div class="relative group cursor-pointer" onclick="openImageModal('${output.static_url}', '${output.name}')">
+            <div class="relative group cursor-pointer" onclick="openImageModal('${fileUrl}', '${output.name}')">
                 <img src="${thumbnailUrl}" alt="${output.name}" loading="lazy" class="w-full h-48 object-cover rounded-lg">
                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">
                     <i class="fas fa-search-plus text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"></i>
@@ -437,15 +477,22 @@ function createResultCard(output) {
             </div>
         `;
     } else if (isVideo) {
-        // 优化视频封面显示逻辑
-        const posterUrl = output.thumbnail_url || `${output.static_url}#t=0.5`;
+        // 优化视频封面显示逻辑，添加加载状态
+        const posterUrl = output.thumbnail_url || `${fileUrl}#t=0.5`;
         previewContent = `
-            <div class="video-preview relative" style="aspect-ratio: 16/9; max-height: 320px;">
-                <video poster="${posterUrl}" class="w-full h-full object-cover rounded-lg" preload="metadata" muted>
-                    <source src="${output.static_url}" type="video/${output.file_type}">
+            <div class="video-preview relative" style="height: 400px; min-height: 300px; max-height: 500px;">
+                <!-- 视频加载状态 -->
+                <div class="video-loading absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                        <div class="text-sm text-gray-600">加载中...</div>
+                    </div>
+                </div>
+                <video poster="${posterUrl}" class="w-full h-full object-fill rounded-lg" preload="metadata" muted onloadeddata="hideVideoLoading(this)" onerror="showVideoError(this)">
+                    <source src="${fileUrl}" type="video/${output.file_type}">
                     您的浏览器不支持视频播放。
                 </video>
-                <div class="play-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-100 hover:opacity-60 transition-opacity duration-200 rounded-lg cursor-pointer">
+                <div class="play-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-100 hover:opacity-60 transition-opacity duration-200 rounded-lg cursor-pointer" onclick="playVideo(this)">
                     <div class="bg-white bg-opacity-90 text-gray-800 p-3 rounded-full shadow-lg hover:bg-opacity-100 transition-all duration-200">
                         <i class="fas fa-play text-xl ml-1"></i>
                     </div>
@@ -475,7 +522,8 @@ function createResultCard(output) {
     const sourceIcon = output.source === 'local' ? '💾' : '☁️';
     
     // 获取完整的文件路径信息
-    const fileName = output.name || output.file_name || output.fileName || 'unknown';
+    const originalFileName = getOriginalFileName(output);
+    const displayFileName = formatFileName(originalFileName);
     const filePath = output.file_path || output.path || output.static_url || '';
     const fullPath = filePath.includes('api/') ? filePath : `api/${filePath}`;
     
@@ -485,7 +533,7 @@ function createResultCard(output) {
             <div class="p-4">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 mr-2">
-                        <h3 class="font-semibold text-gray-900 mb-1 break-words leading-tight">${fileName}</h3>
+                        <h3 class="font-semibold text-gray-900 mb-1 break-words leading-tight" title="原始文件名: ${originalFileName}">${displayFileName}</h3>
                         <div class="text-xs text-gray-500 break-all">
                             <div class="mb-1">路径: ${fullPath}</div>
                             <div>来源: ${sourceLabel}</div>
@@ -508,11 +556,11 @@ function createResultCard(output) {
                     </div>
                 </div>
                 <div class="flex space-x-2">
-                    <button onclick="handleDownload('${output.static_url}', '${fileName}')" class="flex-1 bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
+                    <button onclick="handleDownloadWithH3Title(this, '${fileUrl}', '${displayFileName}')" class="flex-1 bg-primary hover:bg-primary-dark text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
                         <i class="fas fa-download text-xs"></i>
                         <span>下载</span>
                     </button>
-                    <a href="${output.static_url}" target="_blank" class="flex-1 bg-secondary hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
+                    <a href="${fileUrl}" target="_blank" class="flex-1 bg-secondary hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1">
                         <i class="fas fa-external-link-alt text-xs"></i>
                         <span>查看</span>
                     </a>
@@ -531,32 +579,71 @@ function formatFileSize(bytes) {
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+// 文件名格式化 - 按照规范：{任务描述前20字符+时间戳.后缀}
+function formatFileName(originalName) {
+    if (!originalName) return 'unknown';
+    
+    // 提取文件扩展名
+    const lastDotIndex = originalName.lastIndexOf('.');
+    const extension = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
+    
+    // 获取任务描述
+    let taskDescription = '';
+    if (currentTaskInfo && currentTaskInfo.task_description) {
+        taskDescription = currentTaskInfo.task_description;
+    } else {
+        // 如果没有任务描述，使用默认值
+        taskDescription = '未命名任务';
+    }
+    
+    // 截取任务描述前20个字符
+    const truncatedDescription = taskDescription.substring(0, 20);
+    
+    // 从原始文件名中提取时间戳
+    let timestamp = '';
+    
+    // 尝试从文件名中提取时间戳（通常是10位数字）
+    const timestampMatch = originalName.match(/_(\d{10})(?:_|\.)/);
+    if (timestampMatch) {
+        timestamp = timestampMatch[1];
+    } else {
+        // 如果没找到时间戳，使用当前时间戳
+        timestamp = Math.floor(Date.now() / 1000).toString();
+    }
+    
+    // 生成格式化的文件名：{任务描述前20字符+时间戳.后缀}
+    const formattedName = `${truncatedDescription}${timestamp}${extension}`;
+    
+    return formattedName;
+}
+
+// 获取原始文件名（用于下载）
+function getOriginalFileName(output) {
+    return output.name || output.file_name || output.fileName || 'unknown';
+}
+
 // 设置画廊监听器
 function setupGalleryListeners() {
-    // 为视频添加播放控制
+    // 初始化视频自动预览功能
+    initVideoAutoPreview();
+    
+    // 为视频添加播放控制 - 移除旧的事件监听器，使用新的onclick方式
     document.querySelectorAll('.video-preview').forEach(container => {
         const video = container.querySelector('video');
         const overlay = container.querySelector('.play-overlay');
         
         if (video && overlay) {
-            // 点击overlay播放视频
-            overlay.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                video.controls = true;
-                video.play();
-                overlay.style.opacity = '0';
-            });
-            
             // 视频播放时隐藏overlay
             video.addEventListener('play', function() {
                 overlay.style.opacity = '0';
+                overlay.style.pointerEvents = 'none';
             });
             
             // 视频暂停时显示overlay（如果没有controls）
             video.addEventListener('pause', function() {
                 if (!video.controls) {
                     overlay.style.opacity = '1';
+                    overlay.style.pointerEvents = 'auto';
                 }
             });
             
@@ -564,9 +651,86 @@ function setupGalleryListeners() {
             video.addEventListener('ended', function() {
                 video.controls = false;
                 overlay.style.opacity = '1';
+                overlay.style.pointerEvents = 'auto';
             });
         }
     });
+}
+
+// 初始化视频自动预览 - 改进版本
+function initVideoAutoPreview() {
+    // 检查用户设置
+    const autoPreviewEnabled = localStorage.getItem('videoAutoPreview') !== 'false';
+    
+    // 处理所有视频预览容器
+    document.querySelectorAll('.video-auto-preview').forEach(container => {
+        const video = container.querySelector('video');
+        const loadingIndicator = container.querySelector('.video-loading');
+        
+        if (!autoPreviewEnabled) {
+            // 自动预览禁用时，显示手动加载按钮
+            if (loadingIndicator && !video.dataset.previewLoaded) {
+                loadingIndicator.style.opacity = '1';
+                loadingIndicator.innerHTML = `
+                    <div class="text-center">
+                        <i class="fas fa-play-circle text-4xl text-blue-500 mb-2"></i>
+                        <p class="text-sm text-gray-600 mb-2">点击加载视频预览</p>
+                        <button onclick="manualLoadVideo(this)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            加载预览
+                        </button>
+                    </div>
+                `;
+            }
+            return;
+        }
+        
+        // 自动预览启用时的逻辑
+        // 创建Intersection Observer用于懒加载
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const container = entry.target;
+                    const video = container.querySelector('video');
+                    
+                    if (video && !video.dataset.previewLoaded) {
+                        preloadVideoPreview(container, video);
+                    }
+                }
+            });
+        }, {
+            rootMargin: '50px',
+            threshold: 0.1
+        });
+        
+        observer.observe(container);
+        
+        // 添加鼠标悬停预览功能
+        let hoverTimeout;
+        
+        container.addEventListener('mouseenter', () => {
+            if (video && !video.dataset.previewLoaded) {
+                hoverTimeout = setTimeout(() => {
+                    preloadVideoPreview(container, video);
+                }, 300); // 300ms延迟，避免快速划过时加载
+            }
+        });
+        
+        container.addEventListener('mouseleave', () => {
+            if (hoverTimeout) {
+                clearTimeout(hoverTimeout);
+            }
+        });
+    });
+}
+
+// 手动加载视频预览
+function manualLoadVideo(button) {
+    const container = button.closest('.video-auto-preview');
+    const video = container.querySelector('video');
+    
+    if (video) {
+        preloadVideoPreview(container, video);
+    }
 }
 
 // 打开图片模态框
@@ -878,29 +1042,30 @@ async function handleDownload(fileUrl, fileName) {
         // 检查浏览器是否支持File System Access API
         if ('showSaveFilePicker' in window) {
             // 使用现代浏览器的文件选择API
-            const lastPath = localStorage.getItem('lastDownloadPath');
             const options = {
                 suggestedName: fileName,
                 types: [{
-                    description: '所有文件',
-                    accept: {'*/*': []}
+                    description: '视频文件',
+                    accept: {
+                        'video/*': ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'],
+                        'audio/*': ['.mp3', '.wav', '.aac', '.flac'],
+                        'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'],
+                        '*/*': []
+                    }
                 }]
             };
-            
-            if (lastPath) {
-                options.startIn = lastPath;
-            }
             
             try {
                 const fileHandle = await window.showSaveFilePicker(options);
                 
-                // 记住选择的路径
-                if (fileHandle.name) {
-                    localStorage.setItem('lastDownloadPath', fileHandle.name);
-                }
+                showDownloadNotification('正在下载文件...', 'info');
                 
                 // 下载文件
                 const response = await fetch(fileUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const blob = await response.blob();
                 const writable = await fileHandle.createWritable();
                 await writable.write(blob);
@@ -908,30 +1073,120 @@ async function handleDownload(fileUrl, fileName) {
                 
                 showDownloadNotification('文件下载成功！', 'success');
             } catch (error) {
-                if (error.name !== 'AbortError') {
-                    console.error('下载失败:', error);
-                    fallbackDownload(fileUrl, fileName);
+                if (error.name === 'AbortError') {
+                    // 用户取消了文件选择
+                    showDownloadNotification('下载已取消', 'info');
+                } else {
+                    console.error('现代API下载失败:', error);
+                    // 降级到强制下载方式
+                    forceDownloadWithBlob(fileUrl, fileName);
                 }
             }
         } else {
-            // 降级到传统下载方式
-            fallbackDownload(fileUrl, fileName);
+            // 降级到强制下载方式
+            forceDownloadWithBlob(fileUrl, fileName);
         }
     } catch (error) {
         console.error('下载处理失败:', error);
-        fallbackDownload(fileUrl, fileName);
+        forceDownloadWithBlob(fileUrl, fileName);
     }
 }
 
-// 传统下载方式
+// 使用h3标题作为文件名的下载函数
+async function handleDownloadWithH3Title(buttonElement, fileUrl, fallbackFileName) {
+    try {
+        // 找到按钮所在的视频卡片容器
+        const videoCard = buttonElement.closest('.video-card');
+        if (!videoCard) {
+            console.error('无法找到视频卡片容器');
+            return handleDownload(fileUrl, fallbackFileName);
+        }
+        
+        // 获取h3标签中的文件名
+        const h3Element = videoCard.querySelector('h3');
+        const h3FileName = h3Element ? h3Element.textContent.trim() : fallbackFileName;
+        
+        // 确保文件名有正确的扩展名
+        let finalFileName = h3FileName;
+        if (!finalFileName.includes('.')) {
+            // 从原始文件名中提取扩展名
+            const fileExtension = fallbackFileName.split('.').pop();
+            if (fileExtension) {
+                finalFileName += '.' + fileExtension;
+            }
+        }
+        
+        // 调用原有的下载函数，但使用h3标题作为文件名
+        await handleDownload(fileUrl, finalFileName);
+    } catch (error) {
+        console.error('获取h3标题失败:', error);
+        // 降级到使用原始文件名
+        await handleDownload(fileUrl, fallbackFileName);
+    }
+}
+
+// 传统下载方式 - 强制下载而不是播放
 function fallbackDownload(fileUrl, fileName) {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showDownloadNotification('文件下载已开始（传统模式）', 'info');
+    try {
+        // 创建一个临时的下载链接
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileName;
+        
+        // 设置样式使其不可见
+        link.style.display = 'none';
+        
+        // 添加到DOM中
+        document.body.appendChild(link);
+        
+        // 触发下载
+        link.click();
+        
+        // 清理DOM
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 100);
+        
+        showDownloadNotification('文件下载已开始', 'info');
+    } catch (error) {
+        console.error('传统下载方式失败:', error);
+        // 如果传统方式也失败，尝试使用fetch + blob方式
+        forceDownloadWithBlob(fileUrl, fileName);
+    }
+}
+
+// 使用Blob强制下载
+async function forceDownloadWithBlob(fileUrl, fileName) {
+    try {
+        showDownloadNotification('正在准备下载...', 'info');
+        
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        // 清理
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+        
+        showDownloadNotification('文件下载成功！', 'success');
+    } catch (error) {
+        console.error('Blob下载失败:', error);
+        showDownloadNotification('下载失败，请稍后重试', 'error');
+    }
 }
 
 // 显示下载通知
@@ -987,6 +1242,64 @@ function toggleActionPanel() {
         icon.classList.remove('fa-chevron-up');
         icon.classList.add('fa-chevron-down');
         icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// 视频相关处理函数
+function hideVideoLoading(video) {
+    const container = video.closest('.video-preview');
+    const loadingDiv = container.querySelector('.video-loading');
+    if (loadingDiv) {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+function showVideoError(video) {
+    const container = video.closest('.video-preview');
+    const loadingDiv = container.querySelector('.video-loading');
+    if (loadingDiv) {
+        loadingDiv.innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+                <div class="text-sm text-red-600">视频加载失败</div>
+            </div>
+        `;
+    }
+}
+
+function playVideo(overlay) {
+    const container = overlay.closest('.video-preview');
+    const video = container.querySelector('video');
+    
+    if (video) {
+        video.controls = true;
+        video.play().then(() => {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+        }).catch(error => {
+            console.error('视频播放失败:', error);
+            showVideoError(video);
+        });
+    }
+}
+
+// 加载状态显示函数
+function showLoadingState() {
+    const loadingHtml = `
+        <div id="page-loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <div class="text-lg text-gray-600">加载任务详情中...</div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHtml);
+}
+
+function hideLoadingState() {
+    const loading = document.getElementById('page-loading');
+    if (loading) {
+        loading.remove();
     }
 }
 

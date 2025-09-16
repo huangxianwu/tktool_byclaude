@@ -48,6 +48,7 @@
                 <input type="checkbox" 
                        id="isPlusCheckbox" 
                        name="is_plus"
+                       checked
                        class="mt-1 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
                 <div class="flex-1">
                     <label for="isPlusCheckbox" class="text-sm font-medium text-gray-900 cursor-pointer">
@@ -90,23 +91,30 @@
     height: 100%;
 }
 
-/* 预览容器优化 - 减小宽度但保持足够高度 */
+/* 预览容器优化 - 增大宽度，减少空白 */
 .image-preview, .video-preview {
-    max-width: 280px;
+    max-width: 400px;
     margin: 0 auto;
 }
 
-/* 调整宽高比为更紧凑的显示 */
+/* 使用更灵活的宽高比设置 */
 .image-preview .aspect-w-16.aspect-h-9,
 .video-preview .aspect-w-16.aspect-h-9 {
-    padding-bottom: 65%; /* 调整为更合适的比例，确保内容完整显示 */
+    padding-bottom: 0; /* 移除固定宽高比 */
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
 }
 
-/* 确保图片和视频在容器内完整显示 */
+/* 确保图片和视频在容器内完整显示，减少空白 */
 .image-preview img,
 .video-preview video {
     object-fit: contain; /* 保持完整画面，不裁剪 */
     object-position: center;
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    border-radius: 8px;
 }
 
 /* 悬停效果优化 */
@@ -122,7 +130,12 @@
     }
     .image-preview .aspect-w-16.aspect-h-9,
     .video-preview .aspect-w-16.aspect-h-9 {
-        padding-bottom: 60%;
+        min-height: 180px;
+        max-height: 250px;
+    }
+    .image-preview img,
+    .video-preview video {
+        max-height: 250px;
     }
 }
 
@@ -221,13 +234,46 @@ function renderFormFields() {
                     </div>
                 `;
                 break;
+            case 'audio':
+                inputHtml = `
+                    <div class="space-y-3">
+                        <input type="file" name="${node.node_id}" accept="audio/*" required 
+                               class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
+                        <div class="audio-preview hidden" id="preview-${node.node_id}">
+                            <div class="relative bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300">
+                                <div class="flex items-center space-x-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-music text-white text-lg"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <audio controls preload="metadata" class="w-full">
+                                            <source src="" type="audio/mpeg">
+                                            您的浏览器不支持音频播放。
+                                        </audio>
+                                        <div class="mt-2 text-sm text-gray-600">
+                                            <span class="audio-filename font-medium"></span>
+                                            <span class="audio-size text-gray-500 ml-2"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs">
+                                    <i class="fas fa-music mr-1"></i>音频预览
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                break;
         }
         
         const typeIcon = {
             'text': 'fas fa-font',
             'number': 'fas fa-hashtag', 
             'image': 'fas fa-image',
-            'video': 'fas fa-video'
+            'video': 'fas fa-video',
+            'audio': 'fas fa-music'
         }[node.node_type] || 'fas fa-circle';
         
         return `
@@ -278,6 +324,25 @@ function addFilePreviewListeners() {
             }
         });
     });
+    
+    // 音频预览
+    document.querySelectorAll('input[type="file"][accept="audio/*"]').forEach(input => {
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const preview = document.getElementById(`preview-${this.name}`);
+                const audio = preview.querySelector('audio source');
+                const filename = preview.querySelector('.audio-filename');
+                const filesize = preview.querySelector('.audio-size');
+                
+                audio.src = URL.createObjectURL(file);
+                preview.querySelector('audio').load();
+                filename.textContent = file.name;
+                filesize.textContent = `(${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                preview.classList.remove('hidden');
+            }
+        });
+    });
 }
 
 // 历史记录管理功能
@@ -296,13 +361,19 @@ class HistoryManager {
     saveHistory(key, value) {
         if (!value || value.trim() === '') return;
         
+        // 清理文本：移除多余空格和折行符
+        let cleanValue = value.replace(/\s+/g, ' ').trim(); // 将多个空格替换为单个空格，并去除首尾空格
+        cleanValue = cleanValue.replace(/[\r\n]+/g, ' '); // 将换行符替换为空格
+        
+        if (!cleanValue || cleanValue === '') return;
+        
         let history = this.getHistory(key);
         
         // 移除重复项
-        history = history.filter(item => item !== value.trim());
+        history = history.filter(item => item !== cleanValue);
         
         // 添加到开头
-        history.unshift(value.trim());
+        history.unshift(cleanValue);
         
         // 限制数量
         if (history.length > this.maxHistoryItems) {
@@ -414,7 +485,12 @@ function selectHistoryItem(element, historyKey) {
     const input = element.closest('.relative').querySelector('.history-input');
     const dropdown = element.closest('.history-dropdown');
     
-    input.value = element.textContent;
+    // 清理文本：移除多余空格和折行符
+    let cleanText = element.textContent;
+    cleanText = cleanText.replace(/\s+/g, ' ').trim(); // 将多个空格替换为单个空格，并去除首尾空格
+    cleanText = cleanText.replace(/[\r\n]+/g, ' '); // 将换行符替换为空格
+    
+    input.value = cleanText;
     dropdown.classList.add('hidden');
     input.focus();
 }
@@ -458,7 +534,7 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
             const value = formData.get(node.node_id);
             let fieldValue = value;
             
-            if (node.node_type === 'image' || node.node_type === 'video') {
+            if (node.node_type === 'image' || node.node_type === 'video' || node.node_type === 'audio') {
                 // 文件类型：转换为base64数据URL
                 if (value && value instanceof File) {
                     try {
@@ -480,6 +556,9 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
                     break;
                 case 'video':
                     fieldName = 'video';
+                    break;
+                case 'audio':
+                    fieldName = 'audio';
                     break;
                 case 'text':
                     fieldName = 'text';

@@ -63,42 +63,91 @@ def create_task():
             ).first()
             
             # 如果是文件类型字段且包含文件数据，则预上传
-            if node and node.node_type in ['image', 'video'] and field_value:
-                try:
-                    # 检查是否为base64编码的文件数据
-                    if isinstance(field_value, str) and (
-                        field_value.startswith('data:') or 
-                        len(field_value) > 1000  # 假设超过1000字符可能是文件数据
-                    ):
+            if node and node.node_type in ['image', 'video', 'audio'] and field_value:
+                # 检查是否为base64编码的文件数据
+                is_base64_data = isinstance(field_value, str) and (
+                    field_value.startswith('data:') or 
+                    len(field_value) > 1000  # 假设超过1000字符可能是文件数据
+                )
+                
+                if is_base64_data:
+                    try:
                         # 解析文件数据 
                         if field_value.startswith('data:'):
                             # base64 data URL格式: data:image/png;base64,iVBORw0KGgoAAAA...
                             header, encoded = field_value.split(',', 1)
                             file_data = base64.b64decode(encoded)
                             
-                            # 从header中提取文件类型
+                            # 从header中提取文件类型和生成合适的文件名
                             if 'image/' in header:
-                                filename = f"upload_{task_id}.png"
+                                # 提取具体的图片格式
+                                if 'image/jpeg' in header or 'image/jpg' in header:
+                                    filename = f"upload_{task_id}.jpg"
+                                elif 'image/png' in header:
+                                    filename = f"upload_{task_id}.png"
+                                elif 'image/gif' in header:
+                                    filename = f"upload_{task_id}.gif"
+                                elif 'image/webp' in header:
+                                    filename = f"upload_{task_id}.webp"
+                                else:
+                                    filename = f"upload_{task_id}.png"  # 默认png
                             elif 'video/' in header:
-                                filename = f"upload_{task_id}.mp4"
+                                # 提取具体的视频格式
+                                if 'video/mp4' in header:
+                                    filename = f"upload_{task_id}.mp4"
+                                elif 'video/avi' in header:
+                                    filename = f"upload_{task_id}.avi"
+                                elif 'video/mov' in header:
+                                    filename = f"upload_{task_id}.mov"
+                                elif 'video/webm' in header:
+                                    filename = f"upload_{task_id}.webm"
+                                else:
+                                    filename = f"upload_{task_id}.mp4"  # 默认mp4
+                            elif 'audio/' in header:
+                                # 提取具体的音频格式
+                                if 'audio/mp3' in header or 'audio/mpeg' in header:
+                                    filename = f"upload_{task_id}.mp3"
+                                elif 'audio/wav' in header:
+                                    filename = f"upload_{task_id}.wav"
+                                elif 'audio/ogg' in header:
+                                    filename = f"upload_{task_id}.ogg"
+                                elif 'audio/aac' in header:
+                                    filename = f"upload_{task_id}.aac"
+                                elif 'audio/flac' in header:
+                                    filename = f"upload_{task_id}.flac"
+                                elif 'audio/m4a' in header:
+                                    filename = f"upload_{task_id}.m4a"
+                                else:
+                                    filename = f"upload_{task_id}.mp3"  # 默认mp3
                             else:
                                 filename = f"upload_{task_id}.bin"
                         else:
-                            # 纯base64数据
+                            # 纯base64数据，根据节点类型生成文件名
                             file_data = base64.b64decode(field_value)
-                            filename = f"upload_{task_id}_{node_data['node_id']}.{node.node_type}"
+                            if node.node_type == 'image':
+                                filename = f"upload_{task_id}_{node_data['node_id']}.png"
+                            elif node.node_type == 'video':
+                                filename = f"upload_{task_id}_{node_data['node_id']}.mp4"
+                            elif node.node_type == 'audio':
+                                filename = f"upload_{task_id}_{node_data['node_id']}.mp3"
+                            else:
+                                filename = f"upload_{task_id}_{node_data['node_id']}.bin"
                         
-                        # 上传文件到RunningHub
-                        file_name = runninghub_service.upload_file(file_data, filename, task_id)
+                        # 根据文件类型选择合适的上传服务
+                        if node.node_type == 'audio':
+                            file_name = runninghub_service.upload_audio_file(file_data, filename, task_id)
+                        else:
+                            file_name = runninghub_service.upload_file(file_data, filename, task_id)
                         
                         # 用返回的fileName替换原始field_value
                         field_value = file_name
                         
-                except Exception as e:
-                    # 文件上传失败，记录错误但继续处理
-                    print(f"File upload failed for node {node_data['node_id']}: {e}")
-                    # 可以选择返回错误或使用原始值
-                    # return jsonify({'error': f'File upload failed: {str(e)}'}), 500
+                    except Exception as e:
+                        # 文件上传失败，记录错误并返回错误响应
+                        # 绝对不能将base64数据存储到数据库中
+                        from flask import current_app
+                        current_app.logger.error(f"File upload failed for node {node_data['node_id']} (type: {node.node_type}): {e}")
+                        return jsonify({'error': f'File upload failed for node {node_data["node_id"]}: {str(e)}'}), 500
             
             # 创建任务数据记录
             task_data = TaskData(
@@ -175,6 +224,35 @@ def upload_file():
             'fileName': file_name,
             'originalName': file.filename,
             'message': 'File uploaded successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/upload/audio', methods=['POST'])
+def upload_audio_file():
+    """音频文件上传接口"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No audio file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No audio file selected'}), 400
+    
+    # 获取任务ID（如果有）
+    task_id = request.headers.get('X-Task-ID')
+    
+    try:
+        # 调用RunningHub服务上传音频文件
+        runninghub_service = RunningHubService()
+        file_data = file.read()
+        file_name = runninghub_service.upload_audio_file(file_data, file.filename, task_id)
+        
+        return jsonify({
+            'fileName': file_name,
+            'originalName': file.filename,
+            'fileType': 'audio',
+            'message': 'Audio file uploaded successfully'
         })
         
     except Exception as e:
@@ -289,12 +367,21 @@ def get_task_logs_history(task_id):
 
 @bp.route('/<task_id>/download-files', methods=['POST'])
 def download_task_files(task_id):
-    """下载任务输出文件到本地"""
-    try:
-        result = task_controller.download_task_files(task_id)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    """下载任务输出文件到本地 - 已禁用（远程模式）"""
+    return jsonify({'error': 'File download is disabled in remote-only mode'}), 403
+    
+    # 原有逻辑已禁用
+    # try:
+    #     # 检查是否为远程模式
+    #     from flask import current_app
+    #     remote_only_mode = current_app.config.get('REMOTE_ONLY_MODE', False)
+    #     if remote_only_mode:
+    #         return jsonify({'error': 'File download is disabled in remote-only mode'}), 403
+    #     
+    #     result = task_controller.download_task_files(task_id)
+    #     return jsonify(result)
+    # except Exception as e:
+    #     return jsonify({'error': str(e)}), 500
 
 @bp.route('/<task_id>/refresh-files', methods=['POST'])
 def refresh_task_files(task_id):

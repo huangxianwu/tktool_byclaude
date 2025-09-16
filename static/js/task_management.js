@@ -723,7 +723,8 @@ class TaskManager {
                     container.innerHTML = '<div class="no-logs">暂无执行日志</div>';
                 } else {
                     container.innerHTML = logs.map(log => {
-                        const timestamp = new Date(log.created_at).toLocaleTimeString();
+                        // 使用统一的时间字段名和格式化函数
+                        const timestamp = this.formatTimestamp(log.timestamp || log.created_at);
                         return `
                             <div class="log-entry">
                                 <span class="log-timestamp">[${timestamp}]</span>
@@ -822,8 +823,8 @@ class TaskManager {
                         <span class="created-time">${createdTime}</span>
                     </div>
                     <div class="card-actions">
-                        <a href="${output.static_url || output.url}" download class="btn btn-download">
-                            ⬇️ 下载
+                        <a href="${output.file_url || output.url}" download="${output.name || 'file'}" class="btn btn-download">
+                            💾 下载
                         </a>
                         <a href="${output.file_url || output.url}" target="_blank" class="btn btn-external">
                             🔗 原始链接
@@ -1123,6 +1124,29 @@ class TaskManager {
                 messageDiv.parentNode.removeChild(messageDiv);
             }
         }, 3000);
+    }
+    
+    // 格式化时间戳
+    formatTimestamp(timestamp) {
+        if (!timestamp) {
+            return '时间未知';
+        }
+        
+        try {
+            const date = new Date(timestamp);
+            if (isNaN(date.getTime())) {
+                return '时间格式错误';
+            }
+            return date.toLocaleTimeString('zh-CN', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } catch (error) {
+            console.warn('时间格式化失败:', error);
+            return '时间解析失败';
+        }
     }
 }
 
