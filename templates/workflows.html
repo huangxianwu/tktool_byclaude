@@ -55,6 +55,35 @@
         </div>
     </div>
 
+    <!-- 工作流ID搜索框 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center space-x-4">
+            <div class="flex-1">
+                <label for="workflow-id-search" class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-search mr-2"></i>工作流ID搜索
+                </label>
+                <input type="text" 
+                       id="workflow-id-search" 
+                       placeholder="输入工作流ID进行精准搜索" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                       x-data="{ searchTimeout: null }"
+                       @input="
+                           clearTimeout(searchTimeout);
+                           searchTimeout = setTimeout(() => {
+                               searchWorkflowById($event.target.value.trim());
+                           }, 300);
+                       ">
+            </div>
+            <button onclick="clearSearch()" 
+                    class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                <i class="fas fa-times mr-1"></i>清空
+            </button>
+        </div>
+        <div id="search-result-info" class="mt-2 text-sm text-gray-500 hidden">
+            <!-- 搜索结果统计信息 -->
+        </div>
+    </div>
+
     <!-- 状态标签选项卡 -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
         <div class="flex space-x-1" x-data="{ activeTab: 'active' }">
@@ -92,10 +121,10 @@
                             工作流ID
                         </th>
                         <th>
-                            关联任务数
+                            任务数
                         </th>
                         <th>
-                            节点数
+                            工作流描述
                         </th>
                         <th>
                             状态
@@ -239,10 +268,28 @@
 <script>
 // 当前状态过滤器 - 默认显示活跃模板
 let currentStatusFilter = 'active';
+let currentWorkflowIdFilter = '';
 
 // 状态过滤函数
 function filterWorkflows(status) {
     currentStatusFilter = status;
+    // 清空搜索框
+    document.getElementById('workflow-id-search').value = '';
+    currentWorkflowIdFilter = '';
+    loadWorkflows();
+}
+
+// 工作流ID搜索函数
+function searchWorkflowById(workflowId) {
+    currentWorkflowIdFilter = workflowId;
+    loadWorkflows();
+}
+
+// 清空搜索
+function clearSearch() {
+    document.getElementById('workflow-id-search').value = '';
+    currentWorkflowIdFilter = '';
+    document.getElementById('search-result-info').classList.add('hidden');
     loadWorkflows();
 }
 
@@ -251,13 +298,29 @@ async function loadWorkflows() {
     const loading = document.getElementById('loading');
     const emptyState = document.getElementById('empty-state');
     const tableContainer = document.getElementById('workflow-table-container');
+    const searchResultInfo = document.getElementById('search-result-info');
     
     loading.classList.remove('hidden');
     emptyState.classList.add('hidden');
     tableContainer.classList.add('hidden');
+    searchResultInfo.classList.add('hidden');
     
     try {
-        const url = currentStatusFilter === 'all' ? '/api/workflows' : `/api/workflows?status=${currentStatusFilter}`;
+        // 构建URL参数
+        let url = '/api/workflows';
+        const params = new URLSearchParams();
+        
+        // 工作流ID搜索优先级最高
+        if (currentWorkflowIdFilter) {
+            params.append('workflow_id', currentWorkflowIdFilter);
+        } else if (currentStatusFilter !== 'all') {
+            params.append('status', currentStatusFilter);
+        }
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
         const response = await fetch(url);
         const workflows = await response.json();
         
@@ -265,10 +328,21 @@ async function loadWorkflows() {
         
         if (!workflows || workflows.length === 0) {
             emptyState.classList.remove('hidden');
+            // 显示搜索结果信息
+            if (currentWorkflowIdFilter) {
+                searchResultInfo.innerHTML = `<i class="fas fa-info-circle mr-1"></i>未找到工作流ID "${currentWorkflowIdFilter}" 的匹配结果`;
+                searchResultInfo.classList.remove('hidden');
+            }
             return;
         }
         
         tableContainer.classList.remove('hidden');
+        
+        // 显示搜索结果统计
+        if (currentWorkflowIdFilter) {
+            searchResultInfo.innerHTML = `<i class="fas fa-check-circle mr-1 text-green-600"></i>找到 ${workflows.length} 个匹配的工作流`;
+            searchResultInfo.classList.remove('hidden');
+        }
         
         // 更新统计信息
         const totalCount = workflows.length;
@@ -293,19 +367,20 @@ async function loadWorkflows() {
                     </td>
                     <td>
                         <div class="workflow-id">
-                            <code>${workflowId.slice(0, 8)}...</code>
+                            <code>${workflowId}</code>
                         </div>
                     </td>
                     <td>
                         <div class="task-count">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                <i class="fas fa-tasks mr-1"></i>
-                                ${taskCount} 个任务
+                                ${taskCount}
                             </span>
                         </div>
                     </td>
                     <td>
-                        <span class="node-count">${nodeCount}</span>
+                        <div class="workflow-description" title="${wf.description || ''}">
+                            <span class="description-text">${wf.description || '暂无描述'}</span>
+                        </div>
                     </td>
                     <td>
                         ${wf.status === 'active' ? 
@@ -481,7 +556,7 @@ async function viewWorkflowDetail(workflowId) {
                     <h4>基本信息</h4>
                     <p><strong>名称:</strong> ${workflow.name}</p>
                     <p><strong>ID:</strong> ${workflow.workflow_id || workflow.id}</p>
-                    <p><strong>描述:</strong> ${workflow.description || '无'}</p>
+                    <p><strong>描述:</strong> ${workflow.description && workflow.description.trim() ? workflow.description : '暂无描述'}</p>
                     <p><strong>创建时间:</strong> ${new Date(workflow.created_at).toLocaleString('zh-CN')}</p>
                 </div>
                 

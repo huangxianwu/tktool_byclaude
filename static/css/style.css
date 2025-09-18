@@ -202,13 +202,24 @@ body {
 }
 
 .nav-link:hover {
-    background: #f3f4f6;
-    color: #374151;
+    background: #f8fafc;
+    color: #1e293b;
+    transform: translateX(2px);
 }
 
 .nav-link.active {
-    background: #6366f1;
-    color: white;
+    background: #4f46e5;
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+}
+
+.nav-link.active .nav-text {
+    color: #ffffff !important;
+}
+
+.nav-link.active i {
+    color: #ffffff !important;
 }
 
 .nav-link i {
@@ -1048,18 +1059,23 @@ nav:not(.sidebar-nav) a:hover {
     background: white;
 }
 
-/* 视频预览 - 9:16比例 */
-.video-preview {
+/* 视频容器 - 适配视频高度 */
+.video-container {
     position: relative;
-    height: 320px; /* 调整为9:16比例高度 */
+    width: 100%;
+    min-height: 200px;
     background: #000;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-.video-preview video {
+.video-container video {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    cursor: pointer;
+    height: auto;
+    min-height: 200px;
+    display: block;
+    object-fit: contain;
+    background: #000;
 }
 
 .video-overlay {
@@ -2207,4 +2223,99 @@ span.file-source i {
 .result-item:hover {
     border-color: #d1d5db;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 工作流表格样式 */
+.workflow-table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.workflow-table {
+    width: 100%;
+    min-width: 1200px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.workflow-table th,
+.workflow-table td {
+    padding: 16px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: middle;
+    line-height: 1.5;
+}
+
+.workflow-table th {
+    background: #f9fafb;
+    font-weight: 500;
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* 工作流ID列 - 不省略，但设置合理宽度 */
+.workflow-table .workflow-id {
+    width: 200px;
+    min-width: 200px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+}
+
+.workflow-table .workflow-id code {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #374151;
+}
+
+/* 任务数列 - 简化样式 */
+.workflow-table .task-count {
+    width: 80px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.workflow-table .task-count span {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+/* 工作流描述列 - 支持省略 */
+.workflow-table .workflow-description {
+    width: 300px;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.workflow-table .description-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.workflow-table .workflow-description:hover .description-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    background: #f9fafb;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 20;
 }

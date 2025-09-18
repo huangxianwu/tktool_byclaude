@@ -33,8 +33,9 @@ def create_app(config_class=Config):
     from app.api.workflows import bp as workflows_bp
     app.register_blueprint(workflows_bp)
     
-    from app.api.outputs import bp as outputs_bp
+    from app.api.outputs import bp as outputs_bp, bp_tasks as outputs_tasks_bp
     app.register_blueprint(outputs_bp)
+    app.register_blueprint(outputs_tasks_bp)
     
     from app.api.task_logs import bp as task_logs_bp
     app.register_blueprint(task_logs_bp)

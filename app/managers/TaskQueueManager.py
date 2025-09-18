@@ -81,7 +81,7 @@ class TaskQueueManager:
                 outputs = self.runninghub_service.get_outputs(runninghub_task_id, task_id)
                 
                 if outputs:
-                    # 保存结果文件URL
+                    # 保存结果文件URL到TaskData
                     for output in outputs:
                         # 根据nodeId找到对应的TaskData记录
                         task_data = TaskData.query.filter_by(
@@ -91,6 +91,43 @@ class TaskQueueManager:
                         
                         if task_data:
                             task_data.file_url = output['fileUrl']
+                    
+                    # 创建TaskOutput记录（远程模式下也需要创建记录用于前端显示）
+                    try:
+                        from app.models.TaskOutput import TaskOutput
+                        for i, output in enumerate(outputs):
+                            file_url = output.get('fileUrl', '')
+                            node_id = output.get('nodeId', f'node_{i}')
+                            file_type = output.get('fileType', 'png')
+                            
+                            # 从URL中提取文件名
+                            file_name = file_url.split('/')[-1] if '/' in file_url else f'output_{i}.{file_type}'
+                            
+                            # 检查是否已存在相同的TaskOutput记录
+                            existing_output = TaskOutput.query.filter_by(
+                                task_id=task_id,
+                                node_id=node_id,
+                                file_url=file_url
+                            ).first()
+                            
+                            if not existing_output:
+                                # 创建新的TaskOutput记录
+                                task_output = TaskOutput(
+                                    task_id=task_id,
+                                    node_id=node_id,
+                                    name=file_name,
+                                    file_url=file_url,
+                                    local_path='',  # 远程模式下本地路径为空
+                                    thumbnail_path='',  # 远程模式下缩略图路径为空
+                                    file_type=file_type,
+                                    file_size=0  # 远程模式下文件大小暂时为0
+                                )
+                                db.session.add(task_output)
+                        
+                        db.session.commit()
+                        self.runninghub_service._log(task_id, f"✅ 已创建{len(outputs)}个TaskOutput记录")
+                    except Exception as e:
+                        self.runninghub_service._log(task_id, f"⚠️ 创建TaskOutput记录失败: {str(e)}")
                     
                     # 禁用自动下载文件到本地的逻辑（远程模式下不需要）
                     # try:

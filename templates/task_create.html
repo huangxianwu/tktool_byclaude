@@ -220,7 +220,7 @@ function renderFormFields() {
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark transition-colors duration-200">
                         <div class="video-preview hidden" id="preview-${node.node_id}">
                             <div class="relative bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300">
-                                <div class="aspect-w-16 aspect-h-9 bg-gray-900 rounded-lg overflow-hidden">
+                                <div class="video-container bg-gray-900 rounded-lg overflow-hidden">
                                     <video controls preload="metadata" class="w-full h-full object-contain rounded-lg">
                                         <source src="" type="video/mp4">
                                         您的浏览器不支持视频播放。
@@ -317,10 +317,32 @@ function addFilePreviewListeners() {
             const file = e.target.files[0];
             if (file) {
                 const preview = document.getElementById(`preview-${this.name}`);
-                const video = preview.querySelector('video source');
-                video.src = URL.createObjectURL(file);
-                preview.querySelector('video').load();
+                const video = preview.querySelector('video');
+                const source = preview.querySelector('video source');
+                
+                // 创建视频URL
+                const videoUrl = URL.createObjectURL(file);
+                source.src = videoUrl;
+                video.load();
+                
+                // 显示预览
                 preview.classList.remove('hidden');
+                
+                // 监听视频加载完成事件，自动调整高度
+                video.addEventListener('loadedmetadata', function() {
+                    const container = this.closest('.video-container');
+                    const aspectRatio = this.videoHeight / this.videoWidth;
+                    const containerWidth = container.offsetWidth;
+                    const calculatedHeight = containerWidth * aspectRatio;
+                    
+                    // 设置最小高度200px，最大高度500px
+                    const finalHeight = Math.max(200, Math.min(500, calculatedHeight));
+                    container.style.height = finalHeight + 'px';
+                    
+                    // 自动播放预览（静音）
+                    this.muted = true;
+                    this.play().catch(e => console.log('Auto-play prevented:', e));
+                });
             }
         });
     });

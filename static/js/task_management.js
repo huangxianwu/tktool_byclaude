@@ -332,10 +332,13 @@ class TaskManager {
     }
     
     resetFilters() {
-        // 重置筛选条件
+        // 保存当前的工作流筛选状态
+        const currentWorkflow = this.filters.workflow;
+        
+        // 重置筛选条件，但保持工作流筛选
         this.filters = {
             status: '',
-            workflow: '',
+            workflow: currentWorkflow, // 保持工作流筛选状态
             timeRange: '',
             search: '',
             sort: 'created_at_desc',
@@ -343,9 +346,10 @@ class TaskManager {
             endDate: ''
         };
         
-        // 重置表单元素
+        // 重置表单元素，但保持工作流筛选器的值
         document.getElementById('status-filter').value = '';
-        document.getElementById('workflow-filter').value = '';
+        // 不重置工作流筛选器的值
+        // document.getElementById('workflow-filter').value = '';
         document.getElementById('time-filter').value = '';
         document.getElementById('search-input').value = '';
         document.getElementById('sort-filter').value = 'created_at_desc';

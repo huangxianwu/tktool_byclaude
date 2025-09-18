@@ -71,6 +71,15 @@
                           x-show="sidebarOpen" 
                           x-transition>任务管理</span>
                 </a>
+                <a href="/outputs" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="outputs">
+                    <i class="fas fa-file-alt w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>产出文件</span>
+                </a>
                 
             </nav>
             

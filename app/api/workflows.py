@@ -9,11 +9,20 @@ bp = Blueprint('workflows', __name__, url_prefix='/api/workflows')
 def get_workflows():
     """获取所有工作流模板"""
     status_filter = request.args.get('status')
+    workflow_id_filter = request.args.get('workflow_id')
     
+    # 构建查询条件
+    query = Workflow.query
+    
+    # 工作流ID精准匹配（优先级最高）
+    if workflow_id_filter and workflow_id_filter.strip():
+        query = query.filter_by(workflow_id=workflow_id_filter.strip())
+    
+    # 状态筛选
     if status_filter and status_filter in ['active', 'inactive']:
-        workflows = Workflow.query.filter_by(status=status_filter).all()
-    else:
-        workflows = Workflow.query.all()
+        query = query.filter_by(status=status_filter)
+    
+    workflows = query.all()
     
     # 为每个工作流添加关联任务数量统计
     result = []
@@ -42,7 +51,11 @@ def create_workflow():
     if existing_workflow:
         return jsonify({'error': 'Workflow ID already exists'}), 400
     
-    workflow = Workflow(workflow_id=workflow_id, name=data['name'])
+    workflow = Workflow(
+        workflow_id=workflow_id, 
+        name=data['name'],
+        description=data.get('description', '')  # 支持描述字段
+    )
     db.session.add(workflow)
     
     # 添加节点
@@ -79,6 +92,9 @@ def update_workflow(workflow_id):
     
     if 'name' in data:
         workflow.name = data['name']
+    
+    if 'description' in data:
+        workflow.description = data['description']
     
     if 'status' in data:
         workflow.status = data['status']
