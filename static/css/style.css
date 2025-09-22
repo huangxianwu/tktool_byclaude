@@ -208,10 +208,10 @@ body {
 }
 
 .nav-link.active {
-    background: #4f46e5;
+    background: var(--primary-color);
     color: #ffffff !important;
     font-weight: 600;
-    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.25);
 }
 
 .nav-link.active .nav-text {
@@ -467,12 +467,12 @@ nav:not(.sidebar-nav) a:hover {
 }
 
 .btn-primary {
-    background: #6366f1;
+    background: var(--primary-color);
     color: white;
 }
 
 .btn-primary:hover {
-    background: #4f46e5;
+    background: #2563eb;
 }
 
 .btn-secondary {
@@ -970,7 +970,7 @@ nav:not(.sidebar-nav) a:hover {
     position: relative;
     height: 320px; /* 调整为9:16比例高度 */
     overflow: hidden;
-    background: #f8f9fa;
+    background: #8f9f9f;
     cursor: pointer;
 }
 
@@ -983,6 +983,7 @@ nav:not(.sidebar-nav) a:hover {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    aspect-ratio: 9 / 16;
 }
 
 .play-overlay {
@@ -1010,7 +1011,7 @@ nav:not(.sidebar-nav) a:hover {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     max-width: 100%;
     box-sizing: border-box;
 }
@@ -1103,7 +1104,7 @@ nav:not(.sidebar-nav) a:hover {
 /* 文件预览 - 9:16比例 */
 .file-preview {
     height: 320px; /* 调整为9:16比例高度 */
-    background: #f8f9fa;
+    background: #8f9f9f;
     display: flex;
     flex-direction: column;
     align-items: center;

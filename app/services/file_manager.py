@@ -9,6 +9,8 @@ from flask import current_app
 from app.models import TaskOutput, Task
 from app import db
 import re
+import subprocess
+import tempfile
 
 class FileManager:
     def __init__(self):
@@ -133,7 +135,9 @@ class FileManager:
                 thumbnail_path = None
                 if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
                     thumbnail_path = self._generate_thumbnail_with_custom_name(local_path, task_id, custom_filename)
-                
+                elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm']:
+                    thumbnail_path = self._generate_video_thumbnail_with_custom_name(local_path, task_id, custom_filename)
+        
                 # 保存到数据库（使用自定义文件名）
                 task_output = TaskOutput(
                     task_id=task_id,
@@ -507,12 +511,11 @@ class FileManager:
             
             # 生成缩略图（仅图片）
             thumbnail_path = None
-            if file_type in ['image', 'png', 'jpg', 'jpeg', 'gif']:
-                try:
-                    thumbnail_path = self._generate_thumbnail_for_file(local_path, task_id)
-                except Exception as thumb_error:
-                    current_app.logger.warning(f"Failed to generate thumbnail for {local_path}: {thumb_error}")
-            
+            if file_type.lower() in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']:
+                thumbnail_path = self._generate_thumbnail_with_custom_name(local_path, task_id, custom_filename)
+            elif file_type.lower() in ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm']:
+                thumbnail_path = self._generate_video_thumbnail_with_custom_name(local_path, task_id, custom_filename)
+        
             # 保存到数据库
             file_size = len(response.content)
             static_url = self._get_static_url(local_path)
@@ -594,6 +597,61 @@ class FileManager:
             current_app.logger.error(f"Error generating thumbnail for {image_path}: {e}")
             return None
     
+    def _extract_video_frame(self, video_path, time_sec=0.5):
+        """使用ffmpeg从视频中抽取一帧，返回临时jpg路径；失败返回None"""
+        try:
+            fd, temp_path = tempfile.mkstemp(suffix='.jpg')
+            os.close(fd)
+            cmd = [
+                'ffmpeg', '-y', '-ss', str(time_sec), '-i', video_path,
+                '-frames:v', '1', '-q:v', '4', temp_path
+            ]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            return temp_path if os.path.exists(temp_path) else None
+        except Exception as e:
+            current_app.logger.warning(f"ffmpeg extract frame failed for {video_path}: {e}")
+            return None
+
+    def _generate_video_thumbnail(self, video_path, task_id, index, node_id, size=(270, 480)):
+        """为视频生成9:16缩略图（默认第0.5秒帧），返回缩略图路径或None"""
+        frame_path = self._extract_video_frame(video_path)
+        if not frame_path:
+            return None
+        try:
+            thumb_path = self._generate_thumbnail(frame_path, task_id, index, node_id, size=size)
+            try:
+                os.remove(frame_path)
+            except Exception:
+                pass
+            return thumb_path
+        except Exception as e:
+            current_app.logger.warning(f"Generate video thumbnail failed: {e}")
+            try:
+                os.remove(frame_path)
+            except Exception:
+                pass
+            return None
+
+    def _generate_video_thumbnail_with_custom_name(self, video_path, task_id, custom_filename, size=(270, 480)):
+        """自定义文件名版本的视频缩略图生成，返回缩略图路径或None"""
+        frame_path = self._extract_video_frame(video_path)
+        if not frame_path:
+            return None
+        try:
+            thumb_path = self._generate_thumbnail_with_custom_name(frame_path, task_id, custom_filename, size=size)
+            try:
+                os.remove(frame_path)
+            except Exception:
+                pass
+            return thumb_path
+        except Exception as e:
+            current_app.logger.warning(f"Generate video thumbnail (custom) failed: {e}")
+            try:
+                os.remove(frame_path)
+            except Exception:
+                pass
+            return None
+
     def cleanup_old_files(self, days=30):
         """清理旧文件"""
         # TODO: 实现文件清理逻辑

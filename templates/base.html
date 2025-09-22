@@ -246,9 +246,11 @@
             const currentPath = window.location.pathname;
             const navLinks = document.querySelectorAll('.nav-link');
             navLinks.forEach(link => {
-                link.classList.remove('bg-primary', 'text-white');
+                // 清理可能残留的激活样式
+                link.classList.remove('bg-primary', 'text-white', 'active');
                 if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('bg-primary', 'text-white');
+                    // 使用统一的 active 类，避免蓝底蓝字的可读性问题
+                    link.classList.add('active');
                     link.classList.remove('text-gray-700', 'hover:bg-gray-100');
                     // 图标也变为白色
                     const icon = link.querySelector('i');

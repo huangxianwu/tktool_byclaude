@@ -88,8 +88,8 @@
          
          .video-preview video {
              width: 100%;
-             height: 320px;
-             object-fit: cover;
+             height: auto; /* 与视频原始比例一致，避免裁剪 */
+             object-fit: contain; /* 与outputs页保持一致，完整显示视频 */
              background-color: #000;
          }
          
@@ -480,7 +480,7 @@ function createResultCard(output) {
         // 优化视频封面显示逻辑，添加加载状态
         const posterUrl = output.thumbnail_url || `${fileUrl}#t=0.5`;
         previewContent = `
-            <div class="video-preview relative" style="height: 400px; min-height: 300px; max-height: 500px;">
+            <div class="video-preview relative video-auto-preview">
                 <!-- 视频加载状态 -->
                 <div class="video-loading absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
                     <div class="text-center">
@@ -488,7 +488,7 @@ function createResultCard(output) {
                         <div class="text-sm text-gray-600">加载中...</div>
                     </div>
                 </div>
-                <video poster="${posterUrl}" class="w-full h-full object-fill rounded-lg" preload="metadata" muted onloadeddata="hideVideoLoading(this)" onerror="showVideoError(this)">
+                <video poster="${posterUrl}" class="w-full rounded-lg" preload="none" muted onloadeddata="hideVideoLoading(this)" onerror="showVideoError(this)">
                     <source src="${fileUrl}" type="video/${output.file_type}">
                     您的浏览器不支持视频播放。
                 </video>
@@ -698,7 +698,7 @@ function initVideoAutoPreview() {
                 }
             });
         }, {
-            rootMargin: '50px',
+            rootMargin: '80px',
             threshold: 0.1
         });
         
@@ -730,6 +730,18 @@ function manualLoadVideo(button) {
     
     if (video) {
         preloadVideoPreview(container, video);
+    }
+}
+
+// 预加载视频预览：与outputs页策略一致，在进入视口时切换为metadata并加载
+function preloadVideoPreview(container, video) {
+    if (!video || video.dataset.previewLoaded === 'true') return;
+    try {
+        video.setAttribute('preload', 'metadata');
+        video.dataset.previewLoaded = 'true';
+        video.load();
+    } catch (e) {
+        console.warn('预加载视频预览失败:', e);
     }
 }
 

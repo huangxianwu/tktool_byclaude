@@ -464,11 +464,12 @@ class RunningHubService:
         """检查账号状态，返回当前任务数量"""
         self._ensure_config()
         try:
-            # 构建查询账号状态的请求
+            # 构建查询账号状态的请求，增加超时设置
             response = requests.get(
                 f"{self.base_url}/account/status",
                 params={"apiKey": self.api_key},
-                headers={'Content-Type': 'application/json'}
+                headers={'Content-Type': 'application/json'},
+                timeout=10  # 10秒超时
             )
             
             if task_id:
@@ -491,6 +492,14 @@ class RunningHubService:
                     self._log(task_id, f"❌ 查询账号状态失败: {error_text}")
             return None
             
+        except requests.exceptions.Timeout:
+            if task_id:
+                self._log(task_id, f"❌ 查询账号状态超时: 请求超过10秒")
+            return None
+        except requests.exceptions.ConnectionError:
+            if task_id:
+                self._log(task_id, f"❌ 查询账号状态连接错误: 无法连接到RunningHub服务")
+            return None
         except Exception as e:
             if task_id:
                 self._log(task_id, f"❌ 查询账号状态异常: {str(e)}")

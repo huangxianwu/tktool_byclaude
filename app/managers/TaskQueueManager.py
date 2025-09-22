@@ -93,24 +93,62 @@ class TaskQueueManager:
                             task_data.file_url = output['fileUrl']
                     
                     # 创建TaskOutput记录（远程模式下也需要创建记录用于前端显示）
+                    task_output_success = False
+                    created_outputs_count = 0
+                    
                     try:
                         from app.models.TaskOutput import TaskOutput
+                        from datetime import datetime
+                        
+                        # 验证outputs数据完整性
+                        if not outputs or not isinstance(outputs, list):
+                            raise ValueError(f"Invalid outputs data: {outputs}")
+                        
+                        # 记录开始创建TaskOutput的时间
+                        from app.utils.timezone_helper import now_utc
+                        creation_start_time = now_utc()
+                        self.runninghub_service._log(task_id, f"🔄 开始创建TaskOutput记录，共{len(outputs)}个输出文件")
+                        
                         for i, output in enumerate(outputs):
-                            file_url = output.get('fileUrl', '')
-                            node_id = output.get('nodeId', f'node_{i}')
-                            file_type = output.get('fileType', 'png')
-                            
-                            # 从URL中提取文件名
-                            file_name = file_url.split('/')[-1] if '/' in file_url else f'output_{i}.{file_type}'
-                            
-                            # 检查是否已存在相同的TaskOutput记录
-                            existing_output = TaskOutput.query.filter_by(
-                                task_id=task_id,
-                                node_id=node_id,
-                                file_url=file_url
-                            ).first()
-                            
-                            if not existing_output:
+                            try:
+                                # 验证单个output数据
+                                if not isinstance(output, dict):
+                                    self.runninghub_service._log(task_id, f"⚠️ 跳过无效的output[{i}]: {output}")
+                                    continue
+                                
+                                file_url = output.get('fileUrl', '').strip()
+                                node_id = output.get('nodeId', f'node_{i}').strip()
+                                file_type = output.get('fileType', 'png').strip()
+                                
+                                # 验证必要字段
+                                if not file_url:
+                                    self.runninghub_service._log(task_id, f"⚠️ 跳过空fileUrl的output[{i}]")
+                                    continue
+                                
+                                if not node_id:
+                                    node_id = f'node_{i}'
+                                
+                                # 从URL中提取文件名，增强文件名处理逻辑
+                                if '/' in file_url:
+                                    file_name = file_url.split('/')[-1]
+                                    # 如果文件名为空或只有扩展名，生成默认名称
+                                    if not file_name or file_name.startswith('.'):
+                                        file_name = f'output_{i}_{creation_start_time.strftime("%Y%m%d_%H%M%S")}.{file_type}'
+                                else:
+                                    file_name = f'output_{i}_{creation_start_time.strftime("%Y%m%d_%H%M%S")}.{file_type}'
+                                
+                                # 检查是否已存在相同的TaskOutput记录（增强去重逻辑）
+                                existing_output = TaskOutput.query.filter_by(
+                                    task_id=task_id,
+                                    node_id=node_id,
+                                    file_url=file_url
+                                ).first()
+                                
+                                if existing_output:
+                                    self.runninghub_service._log(task_id, f"ℹ️ TaskOutput记录已存在: {node_id} - {file_name}")
+                                    created_outputs_count += 1  # 已存在的也算作成功
+                                    continue
+                                
                                 # 创建新的TaskOutput记录
                                 task_output = TaskOutput(
                                     task_id=task_id,
@@ -120,14 +158,47 @@ class TaskQueueManager:
                                     local_path='',  # 远程模式下本地路径为空
                                     thumbnail_path='',  # 远程模式下缩略图路径为空
                                     file_type=file_type,
-                                    file_size=0  # 远程模式下文件大小暂时为0
+                                    file_size=0,  # 远程模式下文件大小暂时为0
+                                    created_at=creation_start_time  # 使用统一的创建时间
                                 )
                                 db.session.add(task_output)
+                                created_outputs_count += 1
+                                
+                                self.runninghub_service._log(task_id, f"✅ 创建TaskOutput记录: {node_id} - {file_name}")
+                                
+                            except Exception as output_error:
+                                self.runninghub_service._log(task_id, f"⚠️ 创建单个TaskOutput记录失败[{i}]: {str(output_error)}")
+                                # 继续处理下一个output，不中断整个流程
+                                continue
                         
-                        db.session.commit()
-                        self.runninghub_service._log(task_id, f"✅ 已创建{len(outputs)}个TaskOutput记录")
+                        # 提交数据库事务
+                        if created_outputs_count > 0:
+                            db.session.commit()
+                            task_output_success = True
+                            creation_end_time = now_utc()
+                            duration = (creation_end_time - creation_start_time).total_seconds()
+                            self.runninghub_service._log(task_id, f"✅ 成功创建{created_outputs_count}个TaskOutput记录，耗时{duration:.2f}秒")
+                        else:
+                            db.session.rollback()
+                            self.runninghub_service._log(task_id, f"⚠️ 没有创建任何TaskOutput记录")
+                            
                     except Exception as e:
-                        self.runninghub_service._log(task_id, f"⚠️ 创建TaskOutput记录失败: {str(e)}")
+                        # 回滚数据库事务
+                        try:
+                            db.session.rollback()
+                        except:
+                            pass
+                        
+                        error_msg = f"创建TaskOutput记录失败: {str(e)}"
+                        self.runninghub_service._log(task_id, f"❌ {error_msg}")
+                        
+                        # 记录详细的错误信息用于调试
+                        import traceback
+                        self.runninghub_service._log(task_id, f"🔍 错误详情: {traceback.format_exc()}")
+                        
+                        # 即使TaskOutput创建失败，也不应该影响任务状态更新
+                        # 但需要记录这个问题以便后续修复
+                        task_output_success = False
                     
                     # 禁用自动下载文件到本地的逻辑（远程模式下不需要）
                     # try:

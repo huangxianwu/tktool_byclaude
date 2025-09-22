@@ -163,10 +163,22 @@ class CentralQueueManager:
                 max_concurrent = current_app.config.get('MAX_CONCURRENT_TASKS', 1)
                 can_start = current_tasks < max_concurrent
                 logger.debug(f"RunningHub status: {current_tasks}/{max_concurrent} tasks, can_start: {can_start}")
+                # 重置连接失败计数器
+                if not hasattr(self, '_runninghub_fail_count'):
+                    self._runninghub_fail_count = 0
+                self._runninghub_fail_count = 0
                 return can_start
             else:
                 # 无法获取RunningHub状态，使用本地数据库作为备选
-                logger.warning("Cannot get RunningHub status, using local database as fallback")
+                # 使用计数器减少警告频率
+                if not hasattr(self, '_runninghub_fail_count'):
+                    self._runninghub_fail_count = 0
+                self._runninghub_fail_count += 1
+                
+                # 只在第一次失败和每10次失败时记录警告
+                if self._runninghub_fail_count == 1 or self._runninghub_fail_count % 10 == 0:
+                    logger.warning(f"Cannot get RunningHub status (attempt {self._runninghub_fail_count}), using local database as fallback")
+                
                 running_count = Task.query.filter(Task.status.in_(['QUEUED', 'RUNNING'])).count()
                 max_concurrent = current_app.config.get('MAX_CONCURRENT_TASKS', 1)
                 can_start = running_count < max_concurrent

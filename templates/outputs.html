@@ -1,1289 +1,1263 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>产出文件管理</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .primary { color: #3b82f6; }
-        .bg-primary { background-color: #3b82f6; }
-        .border-primary { border-color: #3b82f6; }
-        
-        /* 批量下载侧拉窗样式 */
-        .batch-download-sidebar {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 400px;
-            height: 100vh;
-            background: white;
-            box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
-            transform: translateX(100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 1000;
-        }
-        
-        .batch-download-sidebar.active {
-            transform: translateX(0);
-        }
-        
-        .batch-download-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-        }
-        
-        .batch-download-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .download-item {
-            border-bottom: 1px solid #e5e7eb;
-            padding: 12px;
-        }
-        
-        .download-item:last-child {
-            border-bottom: none;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: #e5e7eb;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: #3b82f6;
-            transition: width 0.3s ease;
-        }
-        
-        .btn-pause, .btn-cancel {
-            padding: 4px 8px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-        
-        .btn-pause:hover {
-            background: #f3f4f6;
-        }
-        
-        .btn-cancel:hover {
-            background: #fef2f2;
-            color: #dc2626;
-        }
-    </style>
-</head>
-<body class="bg-gray-50">
-    <div class="container mx-auto px-4 py-8">
-        <!-- 页面标题 -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">产出文件管理</h1>
-            <p class="text-gray-600">管理和下载工作流产出的文件</p>
-        </div>
+{% extends "base.html" %}
 
-        <!-- 批量操作栏 -->
-        <div id="batch-actions" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg hidden">
-            <div class="flex items-center justify-between">
-                <span class="text-blue-800 font-medium">
-                    <i class="fas fa-check-square mr-2"></i>
-                    已选择 <span id="selected-count">0</span> 个文件
-                </span>
-                <div class="space-x-2">
-                    <button id="batch-download-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-download mr-2"></i>批量下载
-                    </button>
-                    <button id="clear-selection-btn" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-                        <i class="fas fa-times mr-2"></i>清除选择
-                    </button>
-                </div>
-            </div>
-        </div>
+{% block page_title %}产出文件{% endblock %}
 
-        <!-- 筛选器 -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">工作流</label>
-                    <select id="workflow-filter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">全部工作流</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">文件类型</label>
-                    <select id="type-filter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">全部类型</option>
-                        <option value="image">图片</option>
-                        <option value="video">视频</option>
-                        <option value="audio">音频</option>
-                        <option value="text">文本</option>
-                        <option value="other">其他</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">时间范围</label>
-                    <select id="time-filter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">全部时间</option>
-                        <option value="today">今天</option>
-                        <option value="week">本周</option>
-                        <option value="month">本月</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">排序</label>
-                    <select id="sort-filter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="created_at_desc">创建时间 (新到旧)</option>
-                        <option value="created_at_asc">创建时间 (旧到新)</option>
-                        <option value="name_asc">文件名 (A-Z)</option>
-                        <option value="name_desc">文件名 (Z-A)</option>
-                        <option value="size_desc">文件大小 (大到小)</option>
-                        <option value="size_asc">文件大小 (小到大)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-                <div class="flex-1">
-                    <div class="relative">
-                        <input type="text" id="search-input" placeholder="搜索文件名..." 
-                               class="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    </div>
-                </div>
-                <button id="reset-filters" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-                    <i class="fas fa-undo mr-2"></i>重置
+{% block content %}
+<!-- 页面头部 -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div class="mb-4 sm:mb-0">
+            <h2 class="text-3xl font-bold text-gray-900">产出文件</h2>
+        <p class="mt-2 text-gray-600">查看和管理所有任务的产出文件</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div id="batch-actions" class="hidden flex items-center space-x-2">
+                <span class="text-sm text-gray-600">已选择 <span id="selected-count">0</span> 个文件</span>
+                <button id="batch-download-btn" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    <i class="fas fa-download mr-2"></i>
+                    批量下载
+                </button>
+                <button id="clear-selection-btn" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    <i class="fas fa-times mr-2"></i>
+                    清除选择
                 </button>
             </div>
-        </div>
-
-        <!-- 文件列表 -->
-        <div id="outputs-container" class="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div id="loading" class="flex items-center justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span class="ml-3 text-gray-600">加载中...</span>
-            </div>
-            
-            <div id="outputs-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-                <!-- 文件卡片将通过JavaScript动态生成 -->
-            </div>
-            
-            <div id="no-results" class="hidden text-center py-12">
-                <i class="fas fa-folder-open text-4xl text-gray-400 mb-4"></i>
-                <p class="text-gray-600">暂无文件</p>
-            </div>
-        </div>
-
-        <!-- 分页 -->
-        <div id="pagination" class="hidden flex items-center justify-between mt-6">
-            <div class="text-sm text-gray-700">
-                显示第 <span id="page-start">1</span> - <span id="page-end">20</span> 项，共 <span id="total-items">0</span> 项
-            </div>
-            <div class="flex items-center space-x-2">
-                <button id="prev-page" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <span id="page-info" class="px-3 py-2 text-sm text-gray-700">第 1 页，共 1 页</span>
-                <button id="next-page" class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 批量下载侧拉窗 -->
-    <div id="batch-download-overlay" class="batch-download-overlay" onclick="batchDownloadManager.close()"></div>
-    <div id="batch-download-sidebar" class="batch-download-sidebar">
-        <!-- 头部 -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">批量下载</h3>
-            <button onclick="batchDownloadManager.close()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-xl"></i>
+            <button onclick="refreshOutputs()" 
+                    class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm">
+                <i class="fas fa-sync-alt mr-2"></i>
+                刷新
             </button>
         </div>
-        
-        <!-- 下载统计 -->
-        <div class="p-4 bg-gray-50 border-b border-gray-200">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm text-gray-600">总进度</span>
-                <span id="overall-progress-text" class="text-sm font-medium text-gray-900">0%</span>
+    </div>
+</div>
+
+<!-- 筛选功能区域 -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        <!-- 基础筛选 -->
+        <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">工作流:</label>
+                <select id="workflow-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors">
+                    <option value="">全部工作流</option>
+                    <!-- 动态加载工作流选项 -->
+                </select>
             </div>
-            <div class="progress-bar mb-3">
-                <div id="overall-progress-fill" class="progress-fill" style="width: 0%"></div>
+            
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">文件类型:</label>
+                <select id="type-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors">
+                    <option value="">全部类型</option>
+                    <option value="image">图片</option>
+                    <option value="video">视频</option>
+                    <option value="audio">音频</option>
+                    <option value="text">文本</option>
+                    <option value="other">其他</option>
+                </select>
             </div>
-            <div class="flex items-center justify-between text-xs text-gray-500">
-                <span>文件: <span id="download-progress">0/0</span></span>
-                <span>速度: <span id="download-speed">--</span></span>
+            
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">时间范围:</label>
+                <select id="time-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors">
+                    <option value="">全部时间</option>
+                    <option value="today">今天</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                </select>
             </div>
         </div>
         
-        <!-- 下载列表 -->
-        <div class="flex-1 overflow-y-auto">
-            <div id="download-list">
-                <!-- 下载项将通过JavaScript动态生成 -->
+        <!-- 搜索和排序 -->
+        <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">排序:</label>
+                <select id="sort-filter" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors">
+                    <option value="created_at_desc">最新创建</option>
+                    <option value="created_at_asc">最早创建</option>
+                    <option value="size_desc">文件大小(大到小)</option>
+                    <option value="size_asc">文件大小(小到大)</option>
+                </select>
             </div>
-        </div>
-        
-        <!-- 底部操作 -->
-        <div class="p-4 border-t border-gray-200 bg-gray-50">
-            <div class="flex space-x-2">
-                <button onclick="batchDownloadManager.pauseAll()" class="flex-1 bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors">
-                    <i class="fas fa-pause mr-2"></i>暂停全部
-                </button>
-                <button onclick="batchDownloadManager.cancelAll()" class="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors">
-                    <i class="fas fa-times mr-2"></i>取消全部
-                </button>
+            
+            <div class="relative">
+                <input type="text" id="search-input" placeholder="搜索任务描述、工作流名称、文件名..." 
+                       class="pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors w-full sm:w-64">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
             </div>
+            
+            <button id="reset-filters" class="inline-flex items-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200">
+                <i class="fas fa-undo mr-2"></i>
+                重置
+            </button>
         </div>
     </div>
+</div>
 
-    <!-- 预览模态框 -->
-    <div id="preview-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden">
-            <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">文件预览</h3>
-                <button onclick="closePreviewModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
+<!-- 加载状态 -->
+<div id="loading" class="hidden flex items-center justify-center py-12">
+    <div class="flex items-center space-x-3 text-gray-600">
+        <i class="fas fa-spinner fa-spin text-xl"></i>
+        <span class="text-lg">加载中...</span>
+    </div>
+</div>
+
+<!-- 产出文件网格 -->
+        <div id="outputs-grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+            <!-- 产出文件卡片将通过JS动态加载 -->
+        </div>
+
+<!-- 空状态 -->
+<div id="empty-state" class="hidden text-center py-12">
+    <div class="text-gray-400 text-6xl mb-4">
+        <i class="fas fa-folder-open"></i>
+    </div>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">暂无产出文件</h3>
+            <p class="text-gray-500">还没有任何任务产生产出文件</p>
+</div>
+
+<!-- 分页导航 -->
+<div id="pagination" class="hidden mt-8 flex items-center justify-between">
+    <div class="text-sm text-gray-700">
+        显示第 <span id="page-start">1</span> - <span id="page-end">20</span> 条，共 <span id="total-count">0</span> 条结果
+    </div>
+    <div class="flex items-center space-x-2">
+        <button id="prev-page" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1"></i>
+            上一页
+        </button>
+        <div id="page-numbers" class="flex space-x-1">
+            <!-- 页码按钮将通过JS动态生成 -->
+        </div>
+        <button id="next-page" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            下一页
+            <i class="fas fa-chevron-right ml-1"></i>
+        </button>
+    </div>
+</div>
+
+<!-- 预览模态框 -->
+<div id="preview-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closePreviewModal()"></div>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modal-title" class="text-lg font-medium text-gray-900">文件预览</h3>
+                    <button onclick="closePreviewModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div id="modal-content" class="max-h-96 overflow-auto">
+                    <!-- 预览内容将通过JS动态加载 -->
+                </div>
             </div>
-            <div id="modal-content" class="p-4 max-h-96 overflow-auto">
-                <!-- 预览内容将通过JavaScript动态加载 -->
-            </div>
-            <div class="flex items-center justify-end space-x-2 p-4 border-t border-gray-200">
-                <button onclick="downloadCurrentFile()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-download mr-2"></i>下载
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button onclick="downloadFile()" class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:ml-3 sm:w-auto sm:text-sm">
+                    <i class="fas fa-download mr-2"></i>
+                    下载
                 </button>
-                <button onclick="closePreviewModal()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                <button onclick="closePreviewModal()" class="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                     关闭
                 </button>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // 全局变量
-        let outputsManager;
-        let batchDownloadManager;
-        let currentPreviewFile = null;
-
-        // 输出管理器类
-        class OutputsManager {
-            constructor() {
-                this.outputs = [];
-                this.filteredOutputs = [];
-                this.currentPage = 1;
-                this.pageSize = 20;
-                this.totalPages = 1;
-                this.filters = {
-                    workflow: '',
-                    type: '',
-                    timeRange: '',
-                    search: '',
-                    sort: 'created_at_desc'
-                };
-            }
-
-            async init() {
-                await this.loadWorkflows();
-                await this.loadOutputs();
-                this.bindEvents();
-            }
-
-            bindEvents() {
-                // 筛选器事件
-                document.getElementById('workflow-filter').addEventListener('change', (e) => {
-                    this.filters.workflow = e.target.value;
-                    this.applyFilters();
-                });
-                
-                document.getElementById('type-filter').addEventListener('change', (e) => {
-                    this.filters.type = e.target.value;
-                    this.applyFilters();
-                });
-                
-                document.getElementById('time-filter').addEventListener('change', (e) => {
-                    this.filters.timeRange = e.target.value;
-                    this.applyFilters();
-                });
-                
-                document.getElementById('sort-filter').addEventListener('change', (e) => {
-                    this.filters.sort = e.target.value;
-                    this.applyFilters();
-                });
-                
-                // 搜索
-                let searchTimeout;
-                document.getElementById('search-input').addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        this.filters.search = e.target.value.trim();
-                        this.applyFilters();
-                    }, 300);
-                });
-                
-                // 重置筛选
-                document.getElementById('reset-filters').addEventListener('click', () => {
-                    this.resetFilters();
-                });
-                
-                // 分页事件
-                document.getElementById('prev-page').addEventListener('click', () => {
-                    if (this.currentPage > 1) {
-                        this.currentPage--;
-                        this.loadOutputs();
-                    }
-                });
-                
-                document.getElementById('next-page').addEventListener('click', () => {
-                    if (this.currentPage < this.totalPages) {
-                        this.currentPage++;
-                        this.loadOutputs();
-                    }
-                });
-                
-                // 批量操作事件
-                this.bindBatchEvents();
-            }
-
-            bindBatchEvents() {
-                // 批量下载按钮
-                document.getElementById('batch-download-btn').addEventListener('click', () => {
-                    this.batchDownload();
-                });
-                
-                // 清除选择按钮
-                document.getElementById('clear-selection-btn').addEventListener('click', () => {
-                    this.clearSelection();
-                });
-                
-                // 监听选择框变化
-                document.addEventListener('change', (e) => {
-                    if (e.target.classList.contains('output-checkbox')) {
-                        this.updateBatchActions();
-                    }
-                });
-            }
-
-            async loadWorkflows() {
-                try {
-                    const response = await fetch('/api/workflows');
-                    const workflows = await response.json();
-                    
-                    const workflowFilter = document.getElementById('workflow-filter');
-                    workflows.forEach(workflow => {
-                        const option = document.createElement('option');
-                        option.value = workflow.id;
-                        option.textContent = workflow.name;
-                        workflowFilter.appendChild(option);
-                    });
-                } catch (error) {
-                    console.error('加载工作流失败:', error);
-                }
-            }
-
-            async loadOutputs() {
-                try {
-                    document.getElementById('loading').classList.remove('hidden');
-                    document.getElementById('outputs-grid').classList.add('hidden');
-                    document.getElementById('no-results').classList.add('hidden');
-                    
-                    const params = new URLSearchParams({
-                        page: this.currentPage,
-                        page_size: this.pageSize,
-                        ...this.filters
-                    });
-                    
-                    const response = await fetch(`/api/outputs?${params}`);
-                    const data = await response.json();
-                    
-                    this.outputs = data.outputs || [];
-                    this.totalPages = data.total_pages || 1;
-                    
-                    this.renderOutputs();
-                    this.updatePagination(data.total_items || 0);
-                    
-                } catch (error) {
-                    console.error('加载产出文件失败:', error);
-                    this.showError('加载产出文件失败');
-                } finally {
-                    document.getElementById('loading').classList.add('hidden');
-                }
-            }
-
-            renderOutputs() {
-                const container = document.getElementById('outputs-grid');
-                const noResults = document.getElementById('no-results');
-                
-                if (this.outputs.length === 0) {
-                    container.classList.add('hidden');
-                    noResults.classList.remove('hidden');
-                    return;
-                }
-                
-                container.innerHTML = '';
-                container.classList.remove('hidden');
-                noResults.classList.add('hidden');
-                
-                this.outputs.forEach(output => {
-                    const card = this.createOutputCard(output);
-                    container.appendChild(card);
-                });
-            }
-
-            createOutputCard(output) {
-                const card = document.createElement('div');
-                card.className = 'bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 group';
-                
-                const fileType = this.getFileType(output.filename);
-                const fileIcon = this.getFileIcon(fileType);
-                
-                card.innerHTML = `
-                    <div class="relative">
-                        <!-- 选择框 - 悬浮在左上角 -->
-                        <div class="absolute top-3 left-3 z-10">
-                            <input type="checkbox" class="output-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2" 
-                                   data-output='${JSON.stringify(output).replace(/'/g, "&apos;")}'>
-                        </div>
-                        
-                        <!-- 文件类型标签 - 悬浮在右上角 -->
-                        <div class="absolute top-3 right-3 z-10">
-                            <div class="flex items-center space-x-1 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded-full">
-                                <i class="${fileIcon}"></i>
-                                <span>${fileType.toUpperCase()}</span>
-                            </div>
-                        </div>
-                        
-                        <!-- 文件预览区域 -->
-                        <div class="relative cursor-pointer" onclick="previewFile('${output.file_path}', '${output.filename}', '${fileType}')">
-                            ${this.renderFilePreview(output, fileType)}
-                            
-                            <!-- 悬浮操作按钮 - 只在hover时显示 -->
-                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                <div class="flex items-center space-x-3">
-                                    <button onclick="event.stopPropagation(); previewFile('${output.file_path}', '${output.filename}', '${fileType}')" 
-                                            class="bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-800 p-3 rounded-full shadow-lg transform hover:scale-110 transition-all duration-200"
-                                            title="预览文件">
-                                        <i class="fas fa-eye text-lg"></i>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); downloadFile('${output.file_path}', '${output.filename}')" 
-                                            class="bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-800 p-3 rounded-full shadow-lg transform hover:scale-110 transition-all duration-200"
-                                            title="下载文件">
-                                        <i class="fas fa-download text-lg"></i>
-                                    </button>
-                                    ${fileType === 'video' ? `
-                                    <button onclick="event.stopPropagation(); playVideoInCard(this, '${output.file_path}', '${output.filename}')" 
-                                            class="bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-800 p-3 rounded-full shadow-lg transform hover:scale-110 transition-all duration-200"
-                                            title="在卡片中播放">
-                                        <i class="fas fa-play text-lg"></i>
-                                    </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 文件信息区域 -->
-                        <div class="p-4">
-                            <div class="space-y-2">
-                                <h3 class="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors" title="${output.filename}">
-                                    ${output.filename}
-                                </h3>
-                                <div class="flex items-center justify-between text-xs text-gray-500">
-                                    <span class="flex items-center space-x-1">
-                                        <i class="fas fa-hdd text-xs"></i>
-                                        <span>${this.formatFileSize(output.file_size || 0)}</span>
-                                    </span>
-                                    <span class="flex items-center space-x-1">
-                                        <i class="fas fa-clock text-xs"></i>
-                                        <span>${this.formatDate(output.created_at)}</span>
-                                    </span>
-                                </div>
-                                <div class="text-xs text-gray-500 truncate flex items-center space-x-1" title="${output.workflow_name || '未知工作流'}">
-                                    <i class="fas fa-project-diagram text-xs"></i>
-                                    <span>${output.workflow_name || '未知工作流'}</span>
-                                </div>
-                            </div>
-                            
-                            <!-- 底部快速操作栏 -->
-                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                                <div class="flex items-center space-x-2">
-                                    <button onclick="previewFile('${output.file_path}', '${output.filename}', '${fileType}')" 
-                                            class="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
-                                        <i class="fas fa-eye mr-1"></i>预览
-                                    </button>
-                                    <span class="text-gray-300">|</span>
-                                    <button onclick="downloadFile('${output.file_path}', '${output.filename}')" 
-                                            class="text-green-600 hover:text-green-700 text-sm font-medium transition-colors">
-                                        <i class="fas fa-download mr-1"></i>下载
-                                    </button>
-                                </div>
-                                <div class="flex items-center space-x-1">
-                                    ${this.renderQuickActions(output, fileType)}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                return card;
-            }
-
-            renderQuickActions(output, fileType) {
-                let actions = [];
-                
-                // 根据文件类型添加特定操作
-                switch (fileType) {
-                    case 'video':
-                        actions.push(`
-                            <button onclick="playVideoInCard(this, '${output.file_path}', '${output.filename}')" 
-                                    class="text-purple-600 hover:text-purple-700 text-xs p-1 rounded hover:bg-purple-50 transition-colors"
-                                    title="在卡片中播放">
-                                <i class="fas fa-play"></i>
-                            </button>
-                        `);
-                        break;
-                    case 'audio':
-                        actions.push(`
-                            <button onclick="playAudioInCard(this, '${output.file_path}', '${output.filename}')" 
-                                    class="text-orange-600 hover:text-orange-700 text-xs p-1 rounded hover:bg-orange-50 transition-colors"
-                                    title="播放音频">
-                                <i class="fas fa-volume-up"></i>
-                            </button>
-                        `);
-                        break;
-                    case 'text':
-                        actions.push(`
-                            <button onclick="editTextFile('${output.file_path}', '${output.filename}')" 
-                                    class="text-indigo-600 hover:text-indigo-700 text-xs p-1 rounded hover:bg-indigo-50 transition-colors"
-                                    title="编辑文本">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        `);
-                        break;
-                }
-                
-                // 添加分享按钮
-                actions.push(`
-                    <button onclick="shareFile('${output.file_path}', '${output.filename}')" 
-                            class="text-gray-600 hover:text-gray-700 text-xs p-1 rounded hover:bg-gray-50 transition-colors"
-                            title="分享文件">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                `);
-                
-                return actions.join('');
-            }
-
-            renderFilePreview(output, fileType) {
-                const previewHeight = 'h-48';
-                
-                switch (fileType) {
-                    case 'image':
-                        return `
-                            <div class="${previewHeight} bg-gray-100 rounded-t-lg overflow-hidden">
-                                <img src="${output.file_path}" alt="${output.filename}" 
-                                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDNIMTBMMTAgMTNIMjFWM1oiIGZpbGw9IiNGM0Y0RjYiLz4KPHBhdGggZD0iTTMgMTFIMTRWMjFIM1YxMVoiIGZpbGw9IiNGM0Y0RjYiLz4KPC9zdmc+'; this.onerror=null;">
-                            </div>
-                        `;
-                    case 'video':
-                        return `
-                            <div class="${previewHeight} bg-gray-900 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                                <video class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                       preload="metadata" muted data-video-path="${output.file_path}">
-                                    <source src="${output.file_path}#t=1" type="video/mp4">
-                                </video>
-                                <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
-                                    <div class="bg-white bg-opacity-80 rounded-full p-3">
-                                        <i class="fas fa-play text-gray-800 text-xl"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    case 'audio':
-                        return `
-                            <div class="${previewHeight} bg-gradient-to-br from-purple-400 to-pink-400 rounded-t-lg flex items-center justify-center">
-                                <div class="text-center text-white">
-                                    <i class="fas fa-music text-4xl mb-2"></i>
-                                    <p class="text-sm font-medium">音频文件</p>
-                                </div>
-                            </div>
-                        `;
-                    case 'text':
-                        return `
-                            <div class="${previewHeight} bg-gradient-to-br from-blue-400 to-indigo-400 rounded-t-lg flex items-center justify-center">
-                                <div class="text-center text-white">
-                                    <i class="fas fa-file-text text-4xl mb-2"></i>
-                                    <p class="text-sm font-medium">文本文件</p>
-                                </div>
-                            </div>
-                        `;
-                    default:
-                        return `
-                            <div class="${previewHeight} bg-gradient-to-br from-gray-400 to-gray-500 rounded-t-lg flex items-center justify-center">
-                                <div class="text-center text-white">
-                                    <i class="${this.getFileIcon(fileType)} text-4xl mb-2"></i>
-                                    <p class="text-sm font-medium">${fileType.toUpperCase()} 文件</p>
-                                </div>
-                            </div>
-                        `;
-                }
-            }
-
-            getFileType(filename) {
-                const ext = filename.split('.').pop().toLowerCase();
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
-                if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv'].includes(ext)) return 'video';
-                if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(ext)) return 'audio';
-                if (['txt', 'md', 'json', 'xml', 'csv', 'log'].includes(ext)) return 'text';
-                if (['pdf'].includes(ext)) return 'pdf';
-                if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'archive';
-                return 'other';
-            }
-
-            getFileIcon(fileType) {
-                const icons = {
-                    image: 'fas fa-image',
-                    video: 'fas fa-video',
-                    audio: 'fas fa-music',
-                    text: 'fas fa-file-text',
-                    pdf: 'fas fa-file-pdf',
-                    archive: 'fas fa-file-archive',
-                    other: 'fas fa-file'
-                };
-                return icons[fileType] || icons.other;
-            }
-
-            formatFileSize(bytes) {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-
-            formatDate(dateString) {
-                const date = new Date(dateString);
-                return date.toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-
-            updateBatchActions() {
-                const checkboxes = document.querySelectorAll('.output-checkbox:checked');
-                const batchActions = document.getElementById('batch-actions');
-                const selectedCount = document.getElementById('selected-count');
-                
-                selectedCount.textContent = checkboxes.length;
-                
-                if (checkboxes.length > 0) {
-                    batchActions.classList.remove('hidden');
-                } else {
-                    batchActions.classList.add('hidden');
-                }
-            }
-
-            clearSelection() {
-                const checkboxes = document.querySelectorAll('.output-checkbox');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-                this.updateBatchActions();
-            }
-
-            async batchDownload() {
-                const checkboxes = document.querySelectorAll('.output-checkbox:checked');
-                if (checkboxes.length === 0) {
-                    alert('请先选择要下载的文件');
-                    return;
-                }
-                
-                const selectedOutputs = Array.from(checkboxes).map(checkbox => {
-                    return JSON.parse(checkbox.dataset.output.replace(/&apos;/g, "'"));
-                });
-                
-                // 初始化批量下载管理器
-                batchDownloadManager.totalFiles = selectedOutputs.length;
-                batchDownloadManager.completedFiles = 0;
-                batchDownloadManager.downloads.clear();
-                
-                // 打开侧拉窗
-                batchDownloadManager.open();
-                
-                // 添加下载任务
-                const downloadIds = [];
-                selectedOutputs.forEach(output => {
-                    const downloadId = batchDownloadManager.addDownload(output);
-                    downloadIds.push(downloadId);
-                });
-                
-                // 开始下载（添加延迟避免同时发起太多请求）
-                for (let i = 0; i < downloadIds.length; i++) {
-                    setTimeout(() => {
-                        batchDownloadManager.startDownload(downloadIds[i]);
-                    }, i * 200); // 每个下载间隔200ms
-                }
-                
-                // 下载完成后清除选择
-                this.clearSelection();
-            }
-
-            applyFilters() {
-                this.currentPage = 1;
+<script>
+class OutputsManager {
+    constructor() {
+        this.outputs = [];
+        this.filteredOutputs = [];
+        this.currentPage = 1;
+        this.pageSize = 20;
+        this.filters = {
+            workflow: '',
+            type: '',
+            timeRange: '',
+            search: '',
+            sort: 'created_at_desc'
+        };
+        this.currentPreviewFile = null;
+    }
+    
+    async init() {
+        await this.loadWorkflows();
+        await this.loadOutputs();
+        this.bindEvents();
+    }
+    
+    bindEvents() {
+        // 筛选器事件
+        document.getElementById('workflow-filter').addEventListener('change', (e) => {
+            this.filters.workflow = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('type-filter').addEventListener('change', (e) => {
+            this.filters.type = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('time-filter').addEventListener('change', (e) => {
+            this.filters.timeRange = e.target.value;
+            this.applyFilters();
+        });
+        
+        document.getElementById('sort-filter').addEventListener('change', (e) => {
+            this.filters.sort = e.target.value;
+            this.applyFilters();
+        });
+        
+        // 搜索
+        let searchTimeout;
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.filters.search = e.target.value.trim();
+                this.applyFilters();
+            }, 300);
+        });
+        
+        // 重置筛选
+        document.getElementById('reset-filters').addEventListener('click', () => {
+            this.resetFilters();
+        });
+        
+        // 分页事件
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (this.currentPage > 1) {
+                this.currentPage--;
                 this.loadOutputs();
             }
-
-            resetFilters() {
-                this.filters = {
-                    workflow: '',
-                    type: '',
-                    timeRange: '',
-                    search: '',
-                    sort: 'created_at_desc'
-                };
-                
-                document.getElementById('workflow-filter').value = '';
-                document.getElementById('type-filter').value = '';
-                document.getElementById('time-filter').value = '';
-                document.getElementById('search-input').value = '';
-                document.getElementById('sort-filter').value = 'created_at_desc';
-                
-                this.applyFilters();
+        });
+        
+        document.getElementById('next-page').addEventListener('click', () => {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.loadOutputs();
             }
-
-            updatePagination(totalItems) {
-                const pagination = document.getElementById('pagination');
-                const pageStart = document.getElementById('page-start');
-                const pageEnd = document.getElementById('page-end');
-                const totalItemsEl = document.getElementById('total-items');
-                const pageInfo = document.getElementById('page-info');
-                const prevBtn = document.getElementById('prev-page');
-                const nextBtn = document.getElementById('next-page');
-                
-                if (totalItems === 0) {
-                    pagination.classList.add('hidden');
-                    return;
+        });
+        
+        // 批量操作事件
+        this.bindBatchEvents();
+    }
+    
+    bindBatchEvents() {
+        // 批量下载按钮
+        document.getElementById('batch-download-btn').addEventListener('click', () => {
+            this.batchDownload();
+        });
+        
+        // 清除选择按钮
+        document.getElementById('clear-selection-btn').addEventListener('click', () => {
+            this.clearSelection();
+        });
+        
+        // 监听选择框变化
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('output-checkbox')) {
+                this.updateBatchActions();
+            }
+        });
+    }
+    
+    updateBatchActions() {
+        const checkboxes = document.querySelectorAll('.output-checkbox:checked');
+        const count = checkboxes.length;
+        const batchActions = document.getElementById('batch-actions');
+        const selectedCount = document.getElementById('selected-count');
+        
+        if (count > 0) {
+             batchActions.classList.remove('hidden');
+            selectedCount.textContent = count;
+        } else {
+            batchActions.classList.add('hidden');
+        }
+    }
+    
+    clearSelection() {
+        const checkboxes = document.querySelectorAll('.output-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        this.updateBatchActions();
+    }
+    
+    async batchDownload() {
+        const checkboxes = document.querySelectorAll('.output-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert('请先选择要下载的文件');
+            return;
+        }
+        
+        const selectedOutputs = Array.from(checkboxes).map(checkbox => {
+            return JSON.parse(checkbox.dataset.output.replace(/&apos;/g, "'"));
+        });
+        
+        // 显示路径选择对话框
+        const saveDirectory = await this.showDirectoryPicker();
+        if (!saveDirectory) {
+            return; // 用户取消了选择
+        }
+        
+        // 显示下载进度
+        const progressDiv = document.createElement('div');
+        progressDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            min-width: 300px;
+            text-align: center;
+        `;
+        progressDiv.innerHTML = `
+            <h3>批量下载进行中...</h3>
+            <div id="download-progress">0 / ${selectedOutputs.length}</div>
+            <div style="width: 100%; background: #f0f0f0; border-radius: 4px; margin: 10px 0;">
+                <div id="progress-bar" style="width: 0%; height: 20px; background: #007bff; border-radius: 4px; transition: width 0.3s;"></div>
+            </div>
+        `;
+        document.body.appendChild(progressDiv);
+        
+        let downloadedCount = 0;
+        
+        // 批量下载文件
+        for (const output of selectedOutputs) {
+            try {
+                // 检查文件路径是否存在
+                if (!output.file_path) {
+                    console.error(`文件路径缺失: ${output.name}`);
+                    continue;
                 }
                 
-                pagination.classList.remove('hidden');
+                // 修复API路径，使用正确的下载端点
+                const downloadUrl = `/api/download_file?file_path=${encodeURIComponent(output.file_path)}`;
+                const response = await fetch(downloadUrl);
                 
-                const start = (this.currentPage - 1) * this.pageSize + 1;
-                const end = Math.min(this.currentPage * this.pageSize, totalItems);
-                
-                pageStart.textContent = start;
-                pageEnd.textContent = end;
-                totalItemsEl.textContent = totalItems;
-                pageInfo.textContent = `第 ${this.currentPage} 页，共 ${this.totalPages} 页`;
-                
-                prevBtn.disabled = this.currentPage <= 1;
-                nextBtn.disabled = this.currentPage >= this.totalPages;
-            }
-
-            showError(message) {
-                alert(message);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    
+                    // 使用File System Access API保存文件
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const fileHandle = await window.showSaveFilePicker({
+                                suggestedName: output.name,
+                                startIn: saveDirectory
+                            });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                        } catch (e) {
+                            // 如果用户取消保存或API不支持，使用降级方式
+                            if (e.name === 'AbortError') {
+                                console.log(`用户取消保存: ${output.name}`);
+                            } else {
+                                console.warn(`File System Access API失败，使用降级方式: ${output.name}`, e);
+                                this.fallbackDownload(blob, output.name);
+                            }
+                            continue;
+                        }
+                    } else {
+                        // 降级到传统下载方式
+                        this.fallbackDownload(blob, output.name);
+                    }
+                    
+                    downloadedCount++;
+                    document.getElementById('download-progress').textContent = `${downloadedCount} / ${selectedOutputs.length}`;
+                    document.getElementById('progress-bar').style.width = `${(downloadedCount / selectedOutputs.length) * 100}%`;
+                    
+                    // 添加延迟避免浏览器阻止多个下载
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else {
+                    const errorText = await response.text();
+                    console.error(`下载失败: ${output.name}, 状态: ${response.status}, 错误: ${errorText}`);
+                }
+            } catch (error) {
+                console.error(`下载出错: ${output.name}`, error);
             }
         }
-
-        // 批量下载管理器类
-        class BatchDownloadManager {
-            constructor() {
-                this.isOpen = false;
-                this.downloads = new Map();
-                this.totalFiles = 0;
-                this.completedFiles = 0;
-                this.totalSize = 0;
-                this.downloadedSize = 0;
-                this.startTime = null;
+        
+        // 下载完成
+        progressDiv.innerHTML = `
+            <h3>下载完成！</h3>
+            <p>已成功下载 ${downloadedCount} 个文件</p>
+            <button onclick="this.parentElement.remove()" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">确定</button>
+        `;
+        
+        // 3秒后自动关闭进度对话框
+        setTimeout(() => {
+            if (progressDiv.parentElement) {
+                progressDiv.remove();
             }
-
-            open() {
-                this.isOpen = true;
-                this.startTime = Date.now();
-                document.getElementById('batch-download-sidebar').classList.add('active');
-                document.getElementById('batch-download-overlay').classList.add('active');
-                this.updateStats();
-            }
-
-            close() {
-                this.isOpen = false;
-                document.getElementById('batch-download-sidebar').classList.remove('active');
-                document.getElementById('batch-download-overlay').classList.remove('active');
-                
-                // 清理未完成的下载
-                this.downloads.forEach(download => {
-                    if (download.status === 'downloading' && download.xhr) {
-                        download.xhr.abort();
-                    }
-                });
-                this.downloads.clear();
-                document.getElementById('download-list').innerHTML = '';
-            }
-
-            addDownload(output) {
-                const downloadId = Date.now() + Math.random();
-                const download = {
-                    id: downloadId,
-                    output: output,
-                    status: 'pending', // pending, downloading, completed, error, paused
-                    progress: 0,
-                    downloadedBytes: 0,
-                    speed: 0,
-                    xhr: null,
-                    error: null
-                };
-                
-                this.downloads.set(downloadId, download);
-                this.totalSize += output.file_size || 0;
-                this.renderDownloadItem(download);
-                this.updateStats();
-                
-                return downloadId;
-            }
-
-            async startDownload(downloadId) {
-                const download = this.downloads.get(downloadId);
-                if (!download || download.status !== 'pending') return;
-                
-                download.status = 'downloading';
-                
-                try {
-                    const xhr = new XMLHttpRequest();
-                    download.xhr = xhr;
-                    
-                    xhr.open('GET', `/download/${encodeURIComponent(download.output.file_path)}`, true);
-                    xhr.responseType = 'blob';
-                    
-                    const startTime = Date.now();
-                    
-                    xhr.onprogress = (event) => {
-                        if (event.lengthComputable) {
-                            download.progress = (event.loaded / event.total) * 100;
-                            download.downloadedBytes = event.loaded;
-                            
-                            const elapsed = (Date.now() - startTime) / 1000;
-                            download.speed = elapsed > 0 ? event.loaded / elapsed : 0;
-                            
-                            this.updateDownloadProgress(downloadId);
-                            this.updateStats();
-                        }
-                    };
-                    
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            download.status = 'completed';
-                            download.progress = 100;
-                            this.completedFiles++;
-                            
-                            // 自动下载文件
-                            const blob = xhr.response;
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = download.output.filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                            
-                        } else {
-                            download.status = 'error';
-                            download.error = `HTTP ${xhr.status}`;
-                        }
-                        
-                        this.updateDownloadProgress(downloadId);
-                        this.updateStats();
-                        
-                        // 检查是否全部完成
-                        if (this.completedFiles === this.totalFiles) {
-                            this.showCompletionMessage();
-                        }
-                    };
-                    
-                    xhr.onerror = () => {
-                        download.status = 'error';
-                        download.error = '网络错误';
-                        this.updateDownloadProgress(downloadId);
-                        this.updateStats();
-                    };
-                    
-                    xhr.send();
-                    
-                } catch (error) {
-                    download.status = 'error';
-                    download.error = error.message;
-                    this.updateDownloadProgress(downloadId);
-                    this.updateStats();
+        }, 3000);
+        
+        // 下载完成后清除选择
+        this.clearSelection();
+    }
+    
+    fallbackDownload(blob, filename) {
+        // 传统下载方式
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+    
+    async showDirectoryPicker() {
+        // 检查浏览器是否支持File System Access API
+        if (window.showDirectoryPicker) {
+            try {
+                const directoryHandle = await window.showDirectoryPicker();
+                return directoryHandle;
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    return null; // 用户取消了选择
                 }
+                console.error('选择目录失败:', e);
             }
-
-            pauseDownload(downloadId) {
-                const download = this.downloads.get(downloadId);
-                if (download && download.status === 'downloading' && download.xhr) {
-                    download.xhr.abort();
-                    download.status = 'paused';
-                    this.updateDownloadProgress(downloadId);
-                }
+        }
+        
+        // 如果不支持，显示提示信息
+        alert('您的浏览器不支持目录选择功能，将使用默认下载方式。建议使用Chrome或Edge浏览器以获得更好的体验。');
+        return 'default'; // 返回默认标识
+    }
+    
+    async loadWorkflows() {
+        try {
+            const response = await fetch('/api/workflows');
+            const workflows = await response.json();
+            
+            const workflowSelect = document.getElementById('workflow-filter');
+            workflows.forEach(workflow => {
+                const option = document.createElement('option');
+                option.value = workflow.workflow_id;
+                option.textContent = workflow.name || workflow.workflow_id.slice(0, 8) + '...';
+                workflowSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('加载工作流失败:', error);
+        }
+    }
+    
+    async loadOutputs() {
+        this.showLoading(true);
+        
+        try {
+            // 构建API请求参数
+            const params = new URLSearchParams();
+            if (this.filters.workflow) params.append('workflow', this.filters.workflow);
+            if (this.filters.type) params.append('type', this.filters.type);
+            if (this.filters.timeRange) params.append('timeRange', this.filters.timeRange);
+            if (this.filters.search) params.append('search', this.filters.search);
+            if (this.filters.sort) params.append('sort', this.filters.sort);
+            params.append('page', this.currentPage);
+            params.append('pageSize', this.pageSize);
+            
+            const url = `/api/outputs${params.toString() ? '?' + params.toString() : ''}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            this.outputs = data.outputs || [];
+            this.totalCount = data.total || 0;
+            this.totalPages = data.totalPages || 1;
+            
+            this.renderOutputs();
+        } catch (error) {
+            console.error('加载产出文件失败:', error);
+            this.showError('加载产出文件失败');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    applyFilters() {
+        // 重置到第一页并重新加载数据
+        this.currentPage = 1;
+        this.loadOutputs();
+    }
+    
+    applyTimeFilter(outputs) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        return outputs.filter(output => {
+            const outputDate = new Date(output.created_at);
+            
+            switch (this.filters.timeRange) {
+                case 'today':
+                    return outputDate >= today;
+                case 'week':
+                    return outputDate >= weekStart;
+                case 'month':
+                    return outputDate >= monthStart;
+                default:
+                    return true;
             }
-
-            cancelDownload(downloadId) {
-                const download = this.downloads.get(downloadId);
-                if (download) {
-                    if (download.xhr) {
-                        download.xhr.abort();
-                    }
-                    this.downloads.delete(downloadId);
-                    document.getElementById(`download-item-${downloadId}`).remove();
-                    this.updateStats();
-                }
+        });
+    }
+    
+    applySorting(outputs) {
+        return outputs.sort((a, b) => {
+            switch (this.filters.sort) {
+                case 'created_at_desc':
+                    return new Date(b.created_at) - new Date(a.created_at);
+                case 'created_at_asc':
+                    return new Date(a.created_at) - new Date(b.created_at);
+                case 'size_desc':
+                    return (b.file_size || 0) - (a.file_size || 0);
+                case 'size_asc':
+                    return (a.file_size || 0) - (b.file_size || 0);
+                default:
+                    return 0;
             }
-
-            renderDownloadItem(download) {
-                const container = document.getElementById('download-list');
-                const item = document.createElement('div');
-                item.id = `download-item-${download.id}`;
-                item.className = 'download-item';
-                item.innerHTML = `
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center space-x-2 flex-1 min-w-0">
-                            <i class="${outputsManager.getFileIcon(outputsManager.getFileType(download.output.filename))} text-gray-500"></i>
-                            <span class="text-sm font-medium text-gray-900 truncate" title="${download.output.filename}">
-                                ${download.output.filename}
+        });
+    }
+    
+    renderOutputs() {
+        const grid = document.getElementById('outputs-grid');
+        const emptyState = document.getElementById('empty-state');
+        const pagination = document.getElementById('pagination');
+        
+        if (this.outputs.length === 0) {
+            grid.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            pagination.classList.add('hidden');
+            return;
+        }
+        
+        emptyState.classList.add('hidden');
+        
+        // 渲染卡片
+        grid.innerHTML = this.outputs.map(output => this.createOutputCard(output)).join('');
+        
+        // 更新分页信息
+        this.updatePagination();
+        pagination.classList.remove('hidden');
+        
+        // 初始化视频懒加载，优化卡片加载性能
+        if (typeof initVideoLazyLoad === 'function') {
+            initVideoLazyLoad();
+        }
+    }
+    
+    createOutputCard(output) {
+        const fileType = this.getFileType(output.filename);
+        const fileIcon = this.getFileIcon(fileType);
+        const fileSize = this.formatFileSize(output.file_size || 0);
+        const createdAt = new Date(output.created_at).toLocaleString();
+        
+        // 统一获取文件URL，支持多种字段名
+        const fileUrl = output.static_url || output.url || output.file_url || output.file_path || '';
+        
+        // 统一显示文件名：按详情页规则（任务描述前20字符+时间戳.后缀）
+        const displayName = this.formatDisplayFileName(output.filename, output.task_description);
+        
+        return `
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 group output-card" data-output-id="${output.id}">
+                <!-- 选择框 -->
+                <div class="absolute top-3 left-3 z-10">
+                    <input type="checkbox" class="output-checkbox w-5 h-5 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2" 
+                           data-output='${JSON.stringify(output).replace(/'/g, "&apos;")}'>
+                </div>
+                
+                <!-- 9:16 视频预览区域 -->
+                <div class="aspect-w-9 aspect-h-16 bg-gray-100 relative" style="padding-bottom: 177.78%; /* 16/9 * 100% */">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        ${this.createPreviewContent(output, fileType, fileUrl)}
+                    </div>
+                    <div class="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs">
+                        <i class="${fileIcon} mr-1"></i>${fileType}
+                    </div>
+                    <!-- 文件来源标识 -->
+                    <div class="absolute bottom-2 left-2">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${output.source === 'local' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+                            <span class="mr-1">${output.source === 'local' ? '💾' : '☁️'}</span>
+                            ${output.source === 'local' ? '本地' : '远程'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="p-4">
+                    <h3 class="font-medium text-gray-900 truncate mb-2" title="原始文件名: ${output.filename}">
+                        ${displayName}
+                    </h3>
+                    
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <div class="flex items-center">
+                            <i class="fas fa-tasks mr-2 text-gray-400"></i>
+                            <span class="truncate" title="${output.task_description || output.task_id}">
+                                ${output.task_description ? output.task_description.slice(0, 30) + '...' : (output.task_id ? output.task_id.slice(0, 8) + '...' : '未知任务')}
                             </span>
                         </div>
-                        <div class="flex items-center space-x-1">
-                            <button onclick="batchDownloadManager.pauseDownload(${download.id})" class="btn-pause" title="暂停">
-                                <i class="fas fa-pause text-xs"></i>
-                            </button>
-                            <button onclick="batchDownloadManager.cancelDownload(${download.id})" class="btn-cancel" title="取消">
-                                <i class="fas fa-times text-xs"></i>
-                            </button>
+                        
+                        <div class="flex items-center">
+                            <i class="fas fa-project-diagram mr-2 text-gray-400"></i>
+                            <span class="truncate" title="${output.workflow_name || '未知工作流'}">
+                                ${output.workflow_name || '未知工作流'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                            <div class="flex items-center">
+                                <i class="fas fa-hdd mr-2 text-gray-400"></i>
+                                <span>${fileSize}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-gray-500">${createdAt}</span>
+                            </div>
+                            <div class="col-span-2 flex items-center">
+                                <i class="fas fa-file-alt mr-2 text-gray-400"></i>
+                                <span>${(output.file_type || fileType || '').toString().toUpperCase() || 'UNKNOWN'}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between text-xs text-gray-500">
-                            <span class="download-status">等待中...</span>
-                            <span class="download-speed">--</span>
+                    
+                    <div class="mt-4 flex space-x-2">
+                        <button onclick="handleDownloadWithH3Title(this, '${fileUrl}', '${output.filename}')" 
+                                class="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-download mr-2"></i>
+                            下载
+                        </button>
+                        <a href="${fileUrl}" target="_blank" 
+                           class="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                            <i class="fas fa-external-link-alt mr-2"></i>
+                            查看
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    createPreviewContent(output, fileType, fileUrl) {
+        switch (fileType) {
+            case 'image':
+                return `
+                    <img src="${fileUrl}" alt="${output.filename}" 
+                         class="w-full h-full object-contain cursor-pointer"
+                         loading="lazy"
+                         onclick="openImageModal('${fileUrl}', '${output.filename}')"
+                         onerror="this.src='/static/images/image-placeholder.png'">
+                `;
+            case 'video':
+                const posterUrl = output.thumbnail_url || `${fileUrl}#t=0.5`;
+                return `
+                    <div class="video-preview relative w-full h-full">
+                        <!-- 视频加载状态 -->
+                        <div class="video-loading absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+                            <div class="text-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                                <div class="text-sm text-gray-600">加载中...</div>
+                            </div>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 0%"></div>
+                        <video poster="${posterUrl}" class="w-full h-full object-contain cursor-pointer" preload="none" muted data-preview-loaded="false" onloadeddata="hideVideoLoading(this)" onerror="showVideoError(this)">
+                            <source src="${fileUrl}" type="video/${output.file_type || 'mp4'}">
+                            您的浏览器不支持视频播放。
+                        </video>
+                        <div class="play-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-100 hover:opacity-60 transition-opacity duration-200 rounded-lg cursor-pointer" onclick="playVideo(this)">
+                            <div class="bg-white bg-opacity-90 text-gray-800 p-3 rounded-full shadow-lg hover:bg-opacity-100 transition-all duration-200">
+                                <i class="fas fa-play text-xl ml-1"></i>
+                            </div>
                         </div>
                     </div>
                 `;
-                container.appendChild(item);
-            }
-
-            updateDownloadProgress(downloadId) {
-                const download = this.downloads.get(downloadId);
-                if (!download) return;
-                
-                const item = document.getElementById(`download-item-${download.id}`);
-                if (!item) return;
-                
-                const statusEl = item.querySelector('.download-status');
-                const speedEl = item.querySelector('.download-speed');
-                const progressFill = item.querySelector('.progress-fill');
-                
-                switch (download.status) {
-                    case 'pending':
-                        statusEl.textContent = '等待中...';
-                        statusEl.className = 'download-status text-gray-500';
-                        break;
-                    case 'downloading':
-                        statusEl.textContent = `下载中... ${download.progress.toFixed(1)}%`;
-                        statusEl.className = 'download-status text-blue-600';
-                        speedEl.textContent = this.formatSpeed(download.speed);
-                        break;
-                    case 'completed':
-                        statusEl.textContent = '已完成';
-                        statusEl.className = 'download-status text-green-600';
-                        speedEl.textContent = '--';
-                        break;
-                    case 'error':
-                        statusEl.textContent = `错误: ${download.error}`;
-                        statusEl.className = 'download-status text-red-600';
-                        speedEl.textContent = '--';
-                        break;
-                    case 'paused':
-                        statusEl.textContent = '已暂停';
-                        statusEl.className = 'download-status text-yellow-600';
-                        speedEl.textContent = '--';
-                        break;
-                }
-                
-                progressFill.style.width = `${download.progress}%`;
-            }
-
-            updateStats() {
-                const totalProgress = this.totalFiles > 0 ? (this.completedFiles / this.totalFiles) * 100 : 0;
-                const elapsedTime = this.startTime ? (Date.now() - this.startTime) / 1000 : 0;
-                
-                // 计算总下载速度
-                let totalSpeed = 0;
-                this.downloads.forEach(download => {
-                    if (download.status === 'downloading') {
-                        totalSpeed += download.speed;
-                    }
-                });
-                
-                document.getElementById('download-progress').textContent = `${this.completedFiles}/${this.totalFiles}`;
-                document.getElementById('download-speed').textContent = this.formatSpeed(totalSpeed);
-                document.getElementById('overall-progress-fill').style.width = `${totalProgress}%`;
-                document.getElementById('overall-progress-text').textContent = `${totalProgress.toFixed(1)}%`;
-            }
-
-            formatSpeed(bytesPerSecond) {
-                if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(0)} B/s`;
-                if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
-                return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
-            }
-
-            showCompletionMessage() {
-                const elapsedTime = (Date.now() - this.startTime) / 1000;
-                alert(`批量下载完成！\n共下载 ${this.completedFiles} 个文件\n用时 ${elapsedTime.toFixed(1)} 秒`);
-            }
-
-            pauseAll() {
-                this.downloads.forEach((download, id) => {
-                    if (download.status === 'downloading') {
-                        this.pauseDownload(id);
-                    }
-                });
-            }
-
-            cancelAll() {
-                const downloadIds = Array.from(this.downloads.keys());
-                downloadIds.forEach(id => this.cancelDownload(id));
-                this.close();
-            }
-        }
-
-        // 全局视频播放管理器
-        class VideoPlayerManager {
-            constructor() {
-                this.currentVideo = null;
-                this.currentCard = null;
-                this.originalContent = null;
-            }
-
-            playVideo(cardElement, videoPath, filename) {
-                // 如果有正在播放的视频，先停止它
-                this.stopCurrentVideo();
-                
-                // 找到预览区域
-                const previewArea = cardElement.closest('.relative').querySelector('.relative.cursor-pointer');
-                if (!previewArea) return;
-                
-                // 保存原始内容
-                this.originalContent = previewArea.innerHTML;
-                this.currentCard = cardElement.closest('.bg-white');
-                
-                // 创建视频播放器
-                const videoPlayer = document.createElement('div');
-                videoPlayer.className = 'h-48 bg-black rounded-t-lg relative overflow-hidden';
-                videoPlayer.innerHTML = `
-                    <video class="w-full h-full object-contain" controls autoplay>
-                        <source src="${videoPath}" type="video/mp4">
-                        您的浏览器不支持视频播放。
-                    </video>
-                    <button onclick="videoPlayerManager.stopVideo()" 
-                            class="absolute top-2 right-2 bg-black bg-opacity-60 text-white p-2 rounded-full hover:bg-opacity-80 transition-opacity"
-                            title="关闭播放器">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-                        ${filename}
+            default:
+                return `
+                    <div class="w-full h-full flex items-center justify-center bg-gray-100 cursor-pointer"
+                         onclick="window.open('${fileUrl}', '_blank')">
+                        <i class="${this.getFileIcon(fileType)} text-4xl text-gray-400"></i>
                     </div>
                 `;
-                
-                // 替换预览内容
-                previewArea.innerHTML = '';
-                previewArea.appendChild(videoPlayer);
-                
-                // 获取视频元素并设置事件监听
-                this.currentVideo = videoPlayer.querySelector('video');
-                this.currentVideo.addEventListener('ended', () => {
-                    this.stopVideo();
-                });
-                
-                // 添加键盘事件监听
-                this.addKeyboardListeners();
-            }
-
-            stopVideo() {
-                if (this.currentVideo) {
-                    this.currentVideo.pause();
-                    this.currentVideo = null;
-                }
-                
-                if (this.currentCard && this.originalContent) {
-                    const previewArea = this.currentCard.querySelector('.relative.cursor-pointer') || 
-                                       this.currentCard.querySelector('.h-48');
-                    if (previewArea) {
-                        previewArea.outerHTML = this.originalContent;
-                    }
-                }
-                
-                this.currentCard = null;
-                this.originalContent = null;
-                this.removeKeyboardListeners();
-            }
-
-            stopCurrentVideo() {
-                if (this.currentVideo) {
-                    this.stopVideo();
-                }
-            }
-
-            addKeyboardListeners() {
-                document.addEventListener('keydown', this.handleKeyPress);
-            }
-
-            removeKeyboardListeners() {
-                document.removeEventListener('keydown', this.handleKeyPress);
-            }
-
-            handleKeyPress = (event) => {
-                if (!this.currentVideo) return;
-                
-                switch (event.code) {
-                    case 'Space':
-                        event.preventDefault();
-                        if (this.currentVideo.paused) {
-                            this.currentVideo.play();
-                        } else {
-                            this.currentVideo.pause();
-                        }
-                        break;
-                    case 'Escape':
-                        event.preventDefault();
-                        this.stopVideo();
-                        break;
-                    case 'ArrowLeft':
-                        event.preventDefault();
-                        this.currentVideo.currentTime = Math.max(0, this.currentVideo.currentTime - 10);
-                        break;
-                    case 'ArrowRight':
-                        event.preventDefault();
-                        this.currentVideo.currentTime = Math.min(this.currentVideo.duration, this.currentVideo.currentTime + 10);
-                        break;
-                }
-            }
         }
-
-        // 全局函数
-        function previewFile(filePath, filename, fileType) {
-            currentPreviewFile = { filePath, filename, fileType };
-            
-            const modal = document.getElementById('preview-modal');
-            const title = document.getElementById('modal-title');
-            const content = document.getElementById('modal-content');
-            
-            title.textContent = filename;
-            
-            switch (fileType) {
-                case 'image':
-                    content.innerHTML = `<img src="${filePath}" alt="${filename}" class="max-w-full max-h-full object-contain">`;
-                    break;
-                case 'video':
-                    content.innerHTML = `<video controls class="max-w-full max-h-full"><source src="${filePath}" type="video/mp4"></video>`;
-                    break;
-                case 'audio':
-                    content.innerHTML = `<audio controls class="w-full"><source src="${filePath}" type="audio/mpeg"></audio>`;
-                    break;
-                case 'text':
-                    fetch(filePath)
-                        .then(response => response.text())
-                        .then(text => {
-                            content.innerHTML = `<pre class="whitespace-pre-wrap text-sm">${text}</pre>`;
-                        })
-                        .catch(error => {
-                            content.innerHTML = `<p class="text-red-600">无法加载文件内容: ${error.message}</p>`;
-                        });
-                    break;
-                default:
-                    content.innerHTML = `<p class="text-gray-600">此文件类型不支持预览</p>`;
-            }
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function playVideoInCard(buttonElement, videoPath, filename) {
-            videoPlayerManager.playVideo(buttonElement, videoPath, filename);
-        }
-
-        function playAudioInCard(buttonElement, audioPath, filename) {
-            // 音频播放功能 - 可以后续扩展
-            alert('音频播放功能开发中...');
-        }
-
-        function editTextFile(filePath, filename) {
-            // 文本编辑功能 - 可以后续扩展
-            alert('文本编辑功能开发中...');
-        }
-
-        function shareFile(filePath, filename) {
-            // 分享功能 - 可以后续扩展
-            if (navigator.share) {
-                navigator.share({
-                    title: filename,
-                    url: filePath
-                }).catch(console.error);
+    }
+    
+    formatDisplayFileName(originalName, taskDescription) {
+        try {
+            if (!originalName) return 'unknown';
+            const lastDotIndex = originalName.lastIndexOf('.');
+            const extension = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
+            let desc = (taskDescription || '未命名任务');
+            const truncated = desc.substring(0, 20);
+            let timestamp = '';
+            const match = originalName.match(/_(\d{10})(?:_|\.)/);
+            if (match) {
+                timestamp = match[1];
             } else {
-                // 复制链接到剪贴板
-                navigator.clipboard.writeText(window.location.origin + filePath)
-                    .then(() => alert('文件链接已复制到剪贴板'))
-                    .catch(() => alert('无法复制链接'));
+                timestamp = Math.floor(Date.now() / 1000).toString();
             }
+            return `${truncated}${timestamp}${extension}`;
+        } catch (e) {
+            return originalName;
         }
-
-        function closePreviewModal() {
-            const modal = document.getElementById('preview-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            currentPreviewFile = null;
+    }
+    
+    getFileType(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+            return 'image';
+        } else if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(ext)) {
+            return 'video';
+        } else if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(ext)) {
+            return 'audio';
+        } else if (['txt', 'md', 'json', 'xml', 'csv'].includes(ext)) {
+            return 'text';
+        } else {
+            return 'other';
         }
-
-        function downloadFile(filePath, filename) {
-            const a = document.createElement('a');
-            a.href = `/download/${encodeURIComponent(filePath)}`;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+    }
+    
+    getFileIcon(fileType) {
+        const icons = {
+            image: 'fas fa-image',
+            video: 'fas fa-video',
+            audio: 'fas fa-music',
+            text: 'fas fa-file-alt',
+            other: 'fas fa-file'
+        };
+        return icons[fileType] || 'fas fa-file';
+    }
+    
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    updatePagination() {
+        const totalPages = this.totalPages || 1;
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = Math.min(startIndex + this.pageSize, this.totalCount || 0);
+        
+        document.getElementById('page-start').textContent = startIndex + 1;
+        document.getElementById('page-end').textContent = endIndex;
+        document.getElementById('total-count').textContent = this.totalCount || 0;
+        
+        document.getElementById('prev-page').disabled = this.currentPage === 1;
+        document.getElementById('next-page').disabled = this.currentPage === totalPages;
+        
+        // 生成页码按钮
+        const pageNumbers = document.getElementById('page-numbers');
+        pageNumbers.innerHTML = '';
+        
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const button = document.createElement('button');
+            button.className = `px-3 py-2 text-sm rounded-lg transition-colors ${
+                i === this.currentPage 
+                    ? 'bg-blue-600 text-white shadow-sm' 
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+            }`;
+            button.textContent = i;
+            button.onclick = () => {
+                this.currentPage = i;
+                this.loadOutputs();
+            };
+            pageNumbers.appendChild(button);
+        }
+    }
+    
+    resetFilters() {
+        this.filters = {
+            workflow: '',
+            type: '',
+            timeRange: '',
+            search: '',
+            sort: 'created_at_desc'
+        };
+        
+        document.getElementById('workflow-filter').value = '';
+        document.getElementById('type-filter').value = '';
+        document.getElementById('time-filter').value = '';
+        document.getElementById('search-input').value = '';
+        document.getElementById('sort-filter').value = 'created_at_desc';
+        
+        this.applyFilters();
+    }
+    
+    showLoading(show) {
+        const loading = document.getElementById('loading');
+        const grid = document.getElementById('outputs-grid');
+        
+        if (show) {
+            loading.classList.remove('hidden');
+            grid.classList.add('hidden');
+        } else {
+            loading.classList.add('hidden');
+            grid.classList.remove('hidden');
+        }
+    }
+    
+    showError(message) {
+        // 这里可以实现错误提示功能
+        console.error(message);
+    }
+}
 
-        function downloadCurrentFile() {
-            if (currentPreviewFile) {
-                downloadFile(currentPreviewFile.filePath, currentPreviewFile.filename);
+// 全局函数
+let outputsManager;
+
+document.addEventListener('DOMContentLoaded', () => {
+    outputsManager = new OutputsManager();
+    outputsManager.init();
+});
+
+// 新增：刷新按钮调用的全局函数，避免 ReferenceError，并按当前筛选条件重新加载
+function refreshOutputs() {
+    if (window.outputsManager && typeof outputsManager.loadOutputs === 'function') {
+        outputsManager.loadOutputs();
+        if (typeof window.showToast === 'function') {
+            window.showToast('已刷新当前列表', 'info', 1200);
+        }
+    }
+}
+
+function openImageModal(imageUrl, imageName) {
+    // 创建图片预览模态框
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="max-w-4xl max-h-full p-4">
+            <div class="relative">
+                <img src="${imageUrl}" alt="${imageName}" class="max-w-full max-h-full object-contain">
+                <button onclick="this.closest('.fixed').remove()" class="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // 点击背景关闭
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+function playVideo(overlay) {
+    const video = overlay.parentElement.querySelector('video');
+    if (video) {
+        video.controls = true;
+        video.play();
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+    }
+}
+
+function hideVideoLoading(video) {
+    const loading = video.parentElement.querySelector('.video-loading');
+    if (loading) {
+        loading.style.display = 'none';
+    }
+}
+
+function showVideoError(video) {
+    const loading = video.parentElement.querySelector('.video-loading');
+    if (loading) {
+        loading.innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+                <div class="text-sm text-red-600">视频加载失败</div>
+            </div>
+        `;
+    }
+}
+
+// 懒加载：进入视口时再加载视频元数据，降低初始加载压力
+function initVideoLazyLoad() {
+    const containers = document.querySelectorAll('.output-card .video-preview');
+    if (!('IntersectionObserver' in window) || containers.length === 0) return;
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const video = entry.target.querySelector('video');
+                if (video && video.dataset.previewLoaded !== 'true') {
+                    video.setAttribute('preload', 'metadata');
+                    video.dataset.previewLoaded = 'true';
+                    try { video.load(); } catch (e) {}
+                }
+                observer.unobserve(entry.target);
             }
-        }
-
-        // 初始化
-        document.addEventListener('DOMContentLoaded', async () => {
-            outputsManager = new OutputsManager();
-            batchDownloadManager = new BatchDownloadManager();
-            videoPlayerManager = new VideoPlayerManager();
-            
-            await outputsManager.init();
         });
-    </script>
-</body>
-</html>
+    }, { rootMargin: '80px', threshold: 0.1 });
+    containers.forEach(c => observer.observe(c));
+}
+
+async function handleDownload(fileUrl, fileName) {
+    try {
+        const resolvedUrl = resolveDownloadUrl(fileUrl);
+        if ('showSaveFilePicker' in window) {
+            const options = {
+                suggestedName: fileName,
+                types: [{
+                    description: '文件',
+                    accept: {
+                        '*/*': ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp3', '.wav', '.aac', '.flac', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.txt', '.json']
+                    }
+                }]
+            };
+            try {
+                const fileHandle = await window.showSaveFilePicker(options);
+                showDownloadNotification('正在下载文件...', 'info');
+                const response = await fetch(resolvedUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const blob = await response.blob();
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                showDownloadNotification('文件下载成功！', 'success');
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    showDownloadNotification('下载已取消', 'info');
+                } else {
+                    console.error('现代API下载失败:', error);
+                    forceDownloadWithBlob(resolvedUrl, fileName);
+                }
+            }
+        } else {
+            forceDownloadWithBlob(resolvedUrl, fileName);
+        }
+    } catch (error) {
+        console.error('下载处理失败:', error);
+        forceDownloadWithBlob(resolveDownloadUrl(fileUrl), fileName);
+    }
+}
+
+async function handleDownloadWithH3Title(button, fileUrl, fallbackFileName) {
+    try {
+        const card = button.closest('.output-card');
+        if (!card) {
+            return handleDownload(fileUrl, fallbackFileName);
+        }
+        const h3 = card.querySelector('h3');
+        const h3Name = h3 ? (h3.textContent || '').trim() : fallbackFileName;
+        let finalName = h3Name && h3Name.includes('.') ? h3Name : fallbackFileName;
+        // 从卡片中获取输出数据以便请求后端生成自定义文件名
+        let customName = '';
+        try {
+            const checkbox = card.querySelector('.output-checkbox');
+            if (checkbox && checkbox.dataset.output) {
+                const output = JSON.parse(checkbox.dataset.output.replace(/&apos;/g, "'"));
+                if (output && output.task_id) {
+                    customName = await getCustomFilename(output.task_id, fileUrl, fallbackFileName);
+                }
+            }
+        } catch (e) { console.warn('获取自定义文件名失败，使用回退名', e); }
+        if (customName) {
+            finalName = customName;
+        }
+        // 确保有扩展名
+        if (!finalName.includes('.')) {
+            const ext = (fallbackFileName.split('.').pop() || '').trim();
+            if (ext) finalName += '.' + ext;
+        }
+        await handleDownload(fileUrl, finalName);
+    } catch (error) {
+        console.error('获取文件名失败:', error);
+        await handleDownload(fileUrl, fallbackFileName);
+    }
+}
+
+function fallbackDownload(fileUrl, fileName) {
+    try {
+        const resolvedUrl = resolveDownloadUrl(fileUrl);
+        const link = document.createElement('a');
+        link.href = resolvedUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => { document.body.removeChild(link); }, 100);
+        showDownloadNotification('文件下载已开始', 'info');
+    } catch (error) {
+        console.error('传统下载方式失败:', error);
+        forceDownloadWithBlob(resolveDownloadUrl(fileUrl), fileName);
+    }
+}
+
+async function forceDownloadWithBlob(fileUrl, fileName) {
+    try {
+        showDownloadNotification('正在准备下载...', 'info');
+        const response = await fetch(resolveDownloadUrl(fileUrl));
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+        showDownloadNotification('文件下载成功！', 'success');
+    } catch (error) {
+        console.error('Blob下载失败:', error);
+        showDownloadNotification('下载失败，请稍后重试', 'error');
+    }
+}
+
+function showDownloadNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full ${type === 'success' ? 'bg-green-50 text-green-700' : type === 'error' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'}`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <span class="mr-2">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span class="mr-4 text-sm">${message}</span>
+            <button onclick="dismissNotification(this)" class="text-xs px-2 py-1 bg-white bg-opacity-50 rounded">关闭</button>
+        </div>
+    `;
+    document.body.appendChild(notification);
+    requestAnimationFrame(() => { notification.style.transform = 'translateX(0)'; });
+    setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+function dismissNotification(button) {
+    const notification = button.closest('div.fixed');
+    if (notification) notification.remove();
+}
+
+function resolveDownloadUrl(fileUrl) {
+    try {
+        if (!fileUrl) return fileUrl;
+        const isHttp = /^https?:\/\//i.test(fileUrl);
+        const isApi = /^\/?api\//i.test(fileUrl) || /\/api\//i.test(fileUrl);
+        const isDownloadApi = /\/api\/download\//i.test(fileUrl);
+        if (isHttp || isApi || isDownloadApi) return fileUrl;
+        // 其余视为本地绝对路径，走统一下载接口
+        return `/api/download/${encodeURIComponent(fileUrl)}`;
+    } catch { return fileUrl; }
+}
+
+async function getCustomFilename(taskId, fileUrl, originalFilename) {
+    try {
+        const res = await fetch(`/api/tasks/${taskId}/generate-filename`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileUrl, originalFilename })
+        });
+        if (!res.ok) return '';
+        const data = await res.json();
+        return data.customFilename || '';
+    } catch (e) { return ''; }
+}
+
+async function previewFile(filePath, filename) {
+    outputsManager.currentPreviewFile = { path: filePath, name: filename };
+    
+    const modal = document.getElementById('preview-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    
+    modalTitle.textContent = filename;
+    
+    const fileType = outputsManager.getFileType(filename);
+    
+    switch (fileType) {
+        case 'image':
+            modalContent.innerHTML = `<img src="${filePath}" alt="${filename}" class="max-w-full h-auto">`;
+            break;
+        case 'video':
+            modalContent.innerHTML = `
+                <video controls class="max-w-full h-auto">
+                    <source src="${filePath}" type="video/mp4">
+                    您的浏览器不支持视频播放。
+                </video>
+            `;
+            break;
+        case 'audio':
+            modalContent.innerHTML = `
+                <audio controls class="w-full">
+                    <source src="${filePath}" type="audio/mpeg">
+                    您的浏览器不支持音频播放。
+                </audio>
+            `;
+            break;
+        case 'text':
+            fetch(filePath)
+                .then(response => response.text())
+                .then(text => {
+                    modalContent.innerHTML = `<pre class="whitespace-pre-wrap text-sm bg-gray-100 p-4 rounded-lg max-h-96 overflow-auto">${text}</pre>`;
+                })
+                .catch(error => {
+                    modalContent.innerHTML = '<p class="text-red-500">无法加载文件内容</p>';
+                });
+            break;
+        default:
+            modalContent.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="${outputsManager.getFileIcon(fileType)} text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-600">此文件类型不支持预览</p>
+                    <p class="text-sm text-gray-500 mt-2">请下载文件查看内容</p>
+                </div>
+            `;
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closePreviewModal() {
+    document.getElementById('preview-modal').classList.add('hidden');
+    outputsManager.currentPreviewFile = null;
+}
+
+function downloadFile(filePath, filename) {
+    if (!filePath && outputsManager.currentPreviewFile) {
+        filePath = outputsManager.currentPreviewFile.path;
+        filename = outputsManager.currentPreviewFile.name;
+    }
+    
+    const link = document.createElement('a');
+    link.href = filePath;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+
+<style>
+/* 自定义样式 - 符合设计规范 */
+.aspect-w-16 {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+}
+
+.aspect-w-16 > * {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+
+/* 卡片悬停效果 - 增强视觉反馈 */
+.group:hover .group-hover\:scale-105 {
+    transform: scale(1.02);
+    transition: transform 0.2s ease-in-out;
+}
+
+.group:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    transition: all 0.2s ease-in-out;
+}
+
+/* 模态框动画 - 玻璃拟态效果 */
+#preview-modal {
+    backdrop-filter: blur(8px);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#preview-modal .bg-white {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-radius: 12px;
+}
+
+/* 分页按钮样式 - 统一设计语言 */
+#pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#pagination button:not(:disabled):hover {
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+/* 筛选器焦点效果增强 */
+select:focus, input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 按钮悬停效果 */
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease-in-out;
+}
+
+/* 输出卡片选择框样式 */
+.output-card {
+    position: relative;
+}
+
+.output-checkbox {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.output-card:hover .output-checkbox {
+    opacity: 1;
+}
+
+.output-checkbox:checked {
+    opacity: 1 !important;
+}
+
+/* 选中状态的卡片样式 */
+.output-card:has(.output-checkbox:checked) {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+    .grid-cols-1 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 640px) {
+    .sm\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .lg\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .xl\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+</style>
+{% endblock %}
