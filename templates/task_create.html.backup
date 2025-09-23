@@ -132,7 +132,97 @@
     .image-preview, .video-preview {
         max-width: 100%;
     }
-    .image-preview .aspect-w-16.aspect-h-9,
+}
+
+/* 通知动画 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* 状态样式 */
+.status-pending {
+    background: linear-gradient(135deg, #FF9800, #F57C00) !important;
+}
+
+.status-running {
+    background: linear-gradient(135deg, #2196F3, #1976D2) !important;
+}
+
+.status-completed {
+    background: linear-gradient(135deg, #4CAF50, #388E3C) !important;
+}
+
+.status-failed {
+    background: linear-gradient(135deg, #F44336, #D32F2F) !important;
+}
+
+.status-stopped {
+    background: linear-gradient(135deg, #9E9E9E, #616161) !important;
+}
+
+/* 通知按钮样式 */
+.notification-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.view-task-btn, .close-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.view-task-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.view-task-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.close-btn {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: rgba(255,255,255,0.2);
+.close-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+</style>
+
+<script>
+let workflowId = null;
     .video-preview .aspect-w-16.aspect-h-9 {
         min-height: 180px;
         max-height: 250px;
@@ -175,9 +265,6 @@ async function loadWorkflow() {
         
         document.getElementById('workflowName').textContent = workflow.name;
         renderFormFields();
-        
-        // 新增：渲染后尝试根据URL中的copyFrom进行预填
-        await tryPrefillFromCopy();
     } catch (error) {
         console.error('加载工作流失败:', error);
     }
@@ -561,14 +648,6 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
     workingBtn.textContent = '处理中...';
     createBtn.disabled = true;
     createAndStartBtn.disabled = true;
-
-    // 新增：在进入异步阶段前，提示“任务转入后台”
-    let backgroundHintEl = null;
-    try {
-        backgroundHintEl = showInfoNotification('任务已提交，正在转入后台处理...', { autoHideMs: 2000 });
-    } catch (_) {
-        // 忽略通知异常
-    }
     
     try {
         // 构建任务数据，包含文件的base64数据
@@ -649,12 +728,14 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
             // 保存历史记录
             saveFormHistory(formData);
             
-            // 成功提示 + 自动刷新
-            const extra = autoStartNextSubmit
-                ? (task.auto_start_success ? '（已提交启动）' : `（启动失败：${task.auto_start_message || '原因未知'}）`)
-                : '';
-            const refreshMs = 3000;
-            showBackgroundSuccessNotification(`任务创建成功！任务ID: ${task.task_id} ${extra}。任务已转入后台处理，页面将在 ${(refreshMs/1000)} 秒后自动刷新。`, task.task_id, { autoRefreshMs: refreshMs });
+            // 显示即时反馈
+            if (autoStartNextSubmit) {
+                showSuccessNotification(`任务已创建并转入后台启动！任务ID: ${task.task_id}`, task.task_id);
+                // 开始轮询任务状态
+                startTaskStatusPolling(task.task_id);
+            } else {
+                showSuccessNotification(`任务创建成功！任务ID: ${task.task_id}`, task.task_id);
+            }
             
             // 重置表单
             document.getElementById('taskForm').reset();
@@ -674,115 +755,8 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
         createAndStartBtn.disabled = false;
         createBtn.textContent = originalCreateText;
         createAndStartBtn.textContent = originalCreateStartText;
-        
-        // 隐藏“后台处理”提示（如果还在）
-        if (backgroundHintEl && backgroundHintEl.parentElement) {
-            try { backgroundHintEl.remove(); } catch (_) {}
-        }
     }
 });
-
-// 信息通知（轻量提示）
-function showInfoNotification(message, { autoHideMs = 2500 } = {}) {
-    const n = document.createElement('div');
-    n.className = 'fixed top-4 right-4 z-50 bg-blue-500 text-white p-3 rounded-lg shadow-lg max-w-md transition-all duration-300 transform translate-x-full';
-    n.innerHTML = `
-        <div class="flex items-start space-x-3">
-            <i class="fas fa-info-circle text-lg mt-0.5"></i>
-            <div class="flex-1">
-                <div class="font-medium">${message}</div>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `;
-    document.body.appendChild(n);
-    setTimeout(() => n.classList.remove('translate-x-full'), 50);
-    if (autoHideMs > 0) {
-        setTimeout(() => {
-            n.classList.add('translate-x-full');
-            setTimeout(() => { if (n.parentElement) n.remove(); }, 300);
-        }, autoHideMs);
-    }
-    return n;
-}
-
-// 成功通知（带自动刷新与取消）
-function showBackgroundSuccessNotification(message, taskId, { autoRefreshMs = 3000 } = {}) {
-    const wrap = document.createElement('div');
-    wrap.className = 'fixed top-4 right-4 z-50 bg-green-500 text-white p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 transform translate-x-full';
-
-    let refreshTimer = null;
-    const refreshCountdownSeconds = Math.max(1, Math.round(autoRefreshMs / 1000));
-    let secondsLeft = refreshCountdownSeconds;
-
-    wrap.innerHTML = `
-        <div class="flex items-start space-x-3">
-            <i class="fas fa-check-circle text-xl mt-0.5"></i>
-            <div class="flex-1">
-                <div class="font-medium">
-                    ${message}
-                </div>
-                <div id="refresh-hint" class="text-sm text-white text-opacity-90 mt-1">
-                    即将刷新（${secondsLeft}s）
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    <button onclick="window.location.href='/tasks/${taskId}'" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-sm transition-colors duration-200">
-                        查看任务
-                    </button>
-                    <button id="cancel-refresh" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-sm transition-colors duration-200">
-                        取消自动刷新
-                    </button>
-                    <button onclick="this.closest('.fixed').remove()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-sm transition-colors duration-200">
-                        关闭
-                    </button>
-                </div>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    `;
-
-    document.body.appendChild(wrap);
-    setTimeout(() => wrap.classList.remove('translate-x-full'), 50);
-
-    // 倒计时与自动刷新
-    const hintEl = wrap.querySelector('#refresh-hint');
-    const tick = () => {
-        secondsLeft -= 1;
-        if (hintEl) hintEl.textContent = `即将刷新（${Math.max(0, secondsLeft)}s）`;
-        if (secondsLeft <= 0) return;
-        refreshTimer = setTimeout(tick, 1000);
-    };
-    refreshTimer = setTimeout(() => {
-        // 最终触发刷新
-        try { window.location.reload(); } catch (_) {}
-    }, autoRefreshMs);
-
-    // 启动倒计时显示（与上面刷新计时并行）
-    setTimeout(tick, 1000);
-
-    // 取消刷新
-    const cancelBtn = wrap.querySelector('#cancel-refresh');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
-            try { if (refreshTimer) clearTimeout(refreshTimer); } catch (_) {}
-            if (hintEl) hintEl.textContent = '已取消自动刷新';
-            cancelBtn.disabled = true;
-            cancelBtn.textContent = '已取消';
-        });
-    }
-
-    // 自动隐藏（不强制）
-    setTimeout(() => {
-        wrap.classList.add('translate-x-full');
-        setTimeout(() => { if (wrap.parentElement) wrap.remove(); }, 300);
-    }, autoRefreshMs + 8000);
-
-    return wrap;
-}
 
 // 文件转base64函数
 function fileToBase64(file) {
@@ -859,133 +833,138 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 新增：根据URL参数copyFrom预填表单
-async function tryPrefillFromCopy() {
-    try {
-        const params = new URLSearchParams(window.location.search);
-        const copyFromTaskId = params.get('copyFrom');
-        if (!copyFromTaskId) return;
+// 任务状态轮询功能
+    function startTaskStatusPolling(taskId) {
+        let pollCount = 0;
+        const maxPolls = 60; // 最多轮询60次（约5分钟）
+        const pollInterval = 5000; // 5秒轮询一次
         
-        await prefillFromTask(copyFromTaskId);
-        showInfoNotification(`已从任务 ${copyFromTaskId} 预填表单，可直接提交或调整后提交。`, { autoHideMs: 3000 });
-    } catch (e) {
-        console.warn('预填失败:', e);
-    }
-}
-
-async function prefillFromTask(taskId) {
-    const resp = await fetch(`/api/tasks/${taskId}`);
-    if (!resp.ok) {
-        console.warn('获取任务详情失败，无法预填');
-        return;
-    }
-    const task = await resp.json();
-    if (!task || !task.data || !Array.isArray(task.data)) return;
-
-    // 校验workflow匹配（防御性判断）
-    if (String(task.workflow_id) !== String(workflowId)) {
-        console.warn('任务与当前工作流不一致，跳过预填');
-        return;
-    }
-
-    // 预填任务描述和Plus勾选
-    try {
-        if (typeof task.task_description === 'string') {
-            const descEl = document.getElementById('taskDescription');
-            if (descEl) descEl.value = task.task_description;
-        }
-        const plusEl = document.getElementById('isPlusCheckbox');
-        if (plusEl && typeof task.is_plus !== 'undefined') {
-            plusEl.checked = !!task.is_plus;
-        }
-    } catch (_) {}
-
-    // 将workflow节点映射，便于按node_id查询类型
-    const nodeTypeMap = new Map();
-    try {
-        (workflow.nodes || []).forEach(n => nodeTypeMap.set(String(n.node_id), n.node_type));
-    } catch (_) {}
-
-    // 遍历任务数据进行预填
-    for (const item of task.data) {
-        const nodeId = String(item.node_id);
-        const fieldValue = item.field_value;
-        const nodeType = nodeTypeMap.get(nodeId);
-        if (!nodeType) continue;
-
-        const inputEl = document.querySelector(`[name="${CSS.escape(nodeId)}"]`);
-        if (!inputEl) continue;
-
-        try {
-            if (nodeType === 'text') {
-                if (typeof fieldValue === 'string') inputEl.value = fieldValue;
-            } else if (nodeType === 'number') {
-                const num = Number(fieldValue);
-                if (!Number.isNaN(num)) inputEl.value = String(num);
-            } else if (nodeType === 'image' || nodeType === 'video' || nodeType === 'audio') {
-                // 尝试将dataURL(base64)回填到<input type="file">
-                if (typeof fieldValue === 'string' && fieldValue.startsWith('data:')) {
-                    try {
-                        const filename = `${taskId}_${nodeId}.${guessExtensionFromDataUrl(fieldValue)}`;
-                        const file = await dataUrlToFile(fieldValue, filename);
-                        await setFileInputFromFile(inputEl, file);
-                        // 触发change以刷新预览
-                        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    } catch (err) {
-                        console.warn('文件预填失败（可能过大或浏览器限制）：', err);
-                        addInlineHint(inputEl, '已加载历史文件内容，但浏览器限制无法自动回填到文件选择器，请手动选择文件');
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/status`);
+                if (response.ok) {
+                    const statusInfo = await response.json();
+                    
+                    // 更新通知内容
+                    updateTaskStatusNotification(taskId, statusInfo);
+                    
+                    // 如果任务完成或失败，停止轮询
+                    if (statusInfo.is_final) {
+                        return;
                     }
-                } else {
-                    // 无法自动填充，给出提示
-                    addInlineHint(inputEl, '无法自动回填历史文件，请手动选择');
+                    
+                    // 继续轮询
+                    pollCount++;
+                    if (pollCount < maxPolls) {
+                        setTimeout(poll, pollInterval);
+                    }
                 }
+            } catch (error) {
+                console.error('Status polling error:', error);
             }
-        } catch (err) {
-            console.warn('字段预填异常:', err);
+        };
+        
+        // 开始轮询
+        setTimeout(poll, pollInterval);
+    }
+    
+    // 更新任务状态通知
+    function updateTaskStatusNotification(taskId, statusInfo) {
+        const notification = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (notification) {
+            const statusElement = notification.querySelector('.task-status');
+            if (statusElement) {
+                statusElement.textContent = statusInfo.status_message;
+                
+                // 添加进度信息
+                if (statusInfo.progress > 0) {
+                    statusElement.textContent += ` (${statusInfo.progress}%)`;
+                }
+                
+                // 根据状态更新样式
+                notification.className = `success-notification ${getStatusClass(statusInfo.status)}`;
+            }
         }
     }
-}
-
-// 将dataURL转换为File
-async function dataUrlToFile(dataUrl, filename) {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    return new File([blob], filename || 'file', { type: blob.type || 'application/octet-stream' });
-}
-
-// 猜测扩展名
-function guessExtensionFromDataUrl(dataUrl) {
-    try {
-        const m = dataUrl.match(/^data:([^;]+);/);
-        if (!m) return 'bin';
-        const mime = m[1];
-        if (mime.includes('png')) return 'png';
-        if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
-        if (mime.includes('gif')) return 'gif';
-        if (mime.includes('mp4')) return 'mp4';
-        if (mime.includes('webm')) return 'webm';
-        if (mime.includes('mp3')) return 'mp3';
-        if (mime.includes('wav')) return 'wav';
-        return 'bin';
-    } catch { return 'bin'; }
-}
-
-// 将File设置到<input type="file">
-async function setFileInputFromFile(inputEl, file) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    inputEl.files = dt.files;
-}
-
-// 在文件输入下面添加轻提示
-function addInlineHint(inputEl, text) {
-    try {
-        const hint = document.createElement('div');
-        hint.className = 'mt-2 text-xs text-gray-500';
-        hint.textContent = text;
-        const parent = inputEl.closest('.space-y-3') || inputEl.parentElement || inputEl;
-        parent.appendChild(hint);
-    } catch (_) {}
-}
+    
+    // 获取状态对应的CSS类
+    function getStatusClass(status) {
+        const statusClasses = {
+            'pending': 'status-pending',
+            'running': 'status-running',
+            'completed': 'status-completed',
+            'failed': 'status-failed',
+            'stopped': 'status-stopped'
+        };
+        return statusClasses[status] || 'status-unknown';
+    }
+    
+    // 升级后的Toast通知系统
+    function showSuccessNotification(message, taskId) {
+        // 创建通知容器（如果不存在）
+        let container = document.getElementById('notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notification-container';
+            container.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 400px;
+            `;
+            document.body.appendChild(container);
+        }
+        
+        // 创建通知元素
+        const notification = document.createElement('div');
+        notification.className = 'success-notification';
+        notification.setAttribute('data-task-id', taskId);
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-message">${message}</div>
+                <div class="task-status">处理中...</div>
+                <div class="notification-actions">
+                    <button onclick="window.location.href='/tasks/${taskId}'" class="view-task-btn">查看任务</button>
+                    <button onclick="closeNotification(this)" class="close-btn">×</button>
+                </div>
+            </div>
+        `;
+        
+        // 添加样式
+        notification.style.cssText = `
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 16px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-out;
+            transition: all 0.3s ease;
+        `;
+        
+        // 插入到容器顶部
+        container.insertBefore(notification, container.firstChild);
+        
+        // 自动隐藏（仅对非轮询任务）
+        if (!taskId || !autoStartNextSubmit) {
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideOut 0.3s ease-in';
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, 5000);
+        }
+    }
+    
+    // 关闭通知
+    function closeNotification(button) {
+        const notification = button.closest('.success-notification');
+        if (notification) {
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }
 </script>
+
 {% endblock %}

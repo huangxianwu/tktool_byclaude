@@ -253,8 +253,9 @@ class TaskQueueService:
                 Task.status.in_(['PENDING', 'QUEUED', 'RUNNING'])
             ).all()
             
-            # 查找长时间未更新的任务（基于started_at字段，超过30分钟）
-            timeout_threshold = now - timedelta(minutes=30)
+            # 查找长时间未更新的任务（基于started_at字段，使用配置的超时时间）
+            timeout_minutes = current_app.config.get('TASK_TIMEOUT_MINUTES', 600)
+            timeout_threshold = now - timedelta(minutes=timeout_minutes)
             stale_tasks = Task.query.filter(
                 Task.started_at < timeout_threshold,
                 Task.status.in_(['QUEUED', 'RUNNING']),

@@ -550,7 +550,7 @@ class OutputsManager {
         this.updatePagination();
         pagination.classList.remove('hidden');
         
-        // 初始化视频懒加载，优化卡片加载性能
+        // 初始化媒体文件懒加载，优化卡片加载性能
         if (typeof initVideoLazyLoad === 'function') {
             initVideoLazyLoad();
         }
@@ -629,7 +629,7 @@ class OutputsManager {
                     </div>
                     
                     <div class="mt-4 flex space-x-2">
-                        <button onclick="handleDownloadWithH3Title(this, '${fileUrl}', '${output.filename}')" 
+                        <button onclick="handleDownloadWithH3Title(this, '${fileUrl}', '${displayName}')" 
                                 class="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                             <i class="fas fa-download mr-2"></i>
                             下载
@@ -677,6 +677,21 @@ class OutputsManager {
                         </div>
                     </div>
                 `;
+            case 'audio':
+                return `
+                    <div class="audio-preview relative w-full h-full bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg">
+                        <div class="absolute inset-0 flex flex-col items-center justify-center p-4">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-music text-4xl text-purple-600 mb-2"></i>
+                                <div class="text-sm font-medium text-gray-700 truncate max-w-full">${output.filename}</div>
+                            </div>
+                            <audio controls class="w-full max-w-xs" preload="none">
+                                <source src="${fileUrl}" type="audio/${output.file_type || 'flac'}">
+                                您的浏览器不支持音频播放。
+                            </audio>
+                        </div>
+                    </div>
+                `;
             default:
                 return `
                     <div class="w-full h-full flex items-center justify-center bg-gray-100 cursor-pointer"
@@ -692,16 +707,14 @@ class OutputsManager {
             if (!originalName) return 'unknown';
             const lastDotIndex = originalName.lastIndexOf('.');
             const extension = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
-            let desc = (taskDescription || '未命名任务');
-            const truncated = desc.substring(0, 20);
-            let timestamp = '';
-            const match = originalName.match(/_(\d{10})(?:_|\.)/);
-            if (match) {
-                timestamp = match[1];
-            } else {
-                timestamp = Math.floor(Date.now() / 1000).toString();
-            }
-            return `${truncated}${timestamp}${extension}`;
+            
+            // 使用完整的任务描述，不截断，移除时间戳
+            let desc = (taskDescription || '未命名任务').trim();
+            
+            // 清理任务描述中的特殊字符，保留中文、英文、数字、空格、常用标点
+            desc = desc.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s\-_()（）【】\[\]]/g, '');
+            
+            return `${desc}${extension}`;
         } catch (e) {
             return originalName;
         }
@@ -890,23 +903,44 @@ function showVideoError(video) {
     }
 }
 
-// 懒加载：进入视口时再加载视频元数据，降低初始加载压力
+// 懒加载：进入视口时再加载媒体文件，降低初始加载压力
 function initVideoLazyLoad() {
-    const containers = document.querySelectorAll('.output-card .video-preview');
+    const containers = document.querySelectorAll('.output-card');
     if (!('IntersectionObserver' in window) || containers.length === 0) return;
+    
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                const video = entry.target.querySelector('video');
+                const card = entry.target;
+                
+                // 处理视频懒加载
+                const video = card.querySelector('video');
                 if (video && video.dataset.previewLoaded !== 'true') {
                     video.setAttribute('preload', 'metadata');
                     video.dataset.previewLoaded = 'true';
                     try { video.load(); } catch (e) {}
                 }
+                
+                // 处理音频懒加载
+                const audio = card.querySelector('audio');
+                if (audio && audio.dataset.previewLoaded !== 'true') {
+                    audio.setAttribute('preload', 'metadata');
+                    audio.dataset.previewLoaded = 'true';
+                    try { audio.load(); } catch (e) {}
+                }
+                
+                // 处理图片懒加载
+                const img = card.querySelector('img[data-src]');
+                if (img && !img.dataset.loaded) {
+                    img.src = img.dataset.src;
+                    img.dataset.loaded = 'true';
+                }
+                
                 observer.unobserve(entry.target);
             }
         });
-    }, { rootMargin: '80px', threshold: 0.1 });
+    }, { rootMargin: '100px', threshold: 0.1 });
+    
     containers.forEach(c => observer.observe(c));
 }
 

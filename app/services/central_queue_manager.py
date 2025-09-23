@@ -56,6 +56,10 @@ class CentralQueueManager:
         self._success_count = 0
         self._skip_count = 0
         
+        # 远程状态缓存（简单TTL，无指数退避）
+        self._status_cache_value = None
+        self._status_cache_time = 0
+        
         self.runninghub_service = RunningHubService()
         self._initialized = True
         
@@ -123,13 +127,20 @@ class CentralQueueManager:
             bool: 是否成功启动了新任务
         """
         try:
+            # 在任何远程状态查询前，先确认是否存在待启动任务
+            if not self._has_pending_tasks():
+                logger.debug("No pending tasks in queue, skipping remote status check")
+                return False
+            
             # 1. 检查是否有可用的执行槽位
             if not self._can_start_task():
-                current_tasks = self.runninghub_service.check_account_status()
-                if current_tasks is not None and current_tasks > 0:
-                    logger.debug(f"RunningHub has {current_tasks} running tasks, waiting for completion")
+                # 使用缓存的远程状态进行日志输出，避免不必要的远程调用
+                current_tasks = self._get_current_tasks_cached()
+                if current_tasks is not None:
+                    max_concurrent = current_app.config.get('MAX_CONCURRENT_TASKS', 1)
+                    logger.debug(f"RunningHub status: {current_tasks}/{max_concurrent} tasks, waiting for completion")
                 else:
-                    logger.debug("No available slots for new tasks")
+                    logger.debug("No available slots for new tasks (using local fallback or unknown remote status)")
                 return False
             
             # 2. 获取下一个待执行的任务
@@ -152,11 +163,48 @@ class CentralQueueManager:
             logger.error(f"Error in internal queue processing: {e}", exc_info=True)
             return False
     
+    def _has_pending_tasks(self) -> bool:
+        """是否存在待启动任务（本地短路）"""
+        try:
+            return Task.query.filter_by(status='PENDING').count() > 0
+        except Exception as e:
+            logger.error(f"Error checking pending tasks: {e}")
+            # 出错时不阻塞调度，返回True以继续后续逻辑
+            return True
+    
+    def _get_current_tasks_cached(self, force_refresh: bool = False) -> Optional[int]:
+        """带TTL的远程任务数获取（简单缓存）"""
+        try:
+            ttl = 30
+            try:
+                ttl = current_app.config.get('RUNNINGHUB_STATUS_TTL', 30)
+            except Exception:
+                pass
+            now = time.time()
+            if (not force_refresh) and self._status_cache_value is not None and (now - self._status_cache_time) < ttl:
+                return self._status_cache_value
+            
+            current_tasks = self.runninghub_service.check_account_status()
+            if current_tasks is not None:
+                self._status_cache_value = current_tasks
+                self._status_cache_time = now
+                return current_tasks
+            # 不缓存None，以便下次有机会重新请求
+            return None
+        except Exception as e:
+            logger.error(f"Error getting cached RunningHub status: {e}")
+            return None
+    
     def _can_start_task(self) -> bool:
         """检查是否可以启动新任务"""
         try:
-            # 首先检查RunningHub的实际任务数量
-            current_tasks = self.runninghub_service.check_account_status()
+            # 本地待启动任务短路：无待启动任务则不需查询远程状态
+            if not self._has_pending_tasks():
+                logger.debug("No pending tasks, skip remote status check")
+                return False
+            
+            # 先尝试使用缓存的远程状态
+            current_tasks = self._get_current_tasks_cached()
             
             if current_tasks is not None:
                 # 成功获取RunningHub状态
@@ -170,12 +218,10 @@ class CentralQueueManager:
                 return can_start
             else:
                 # 无法获取RunningHub状态，使用本地数据库作为备选
-                # 使用计数器减少警告频率
                 if not hasattr(self, '_runninghub_fail_count'):
                     self._runninghub_fail_count = 0
                 self._runninghub_fail_count += 1
                 
-                # 只在第一次失败和每10次失败时记录警告
                 if self._runninghub_fail_count == 1 or self._runninghub_fail_count % 10 == 0:
                     logger.warning(f"Cannot get RunningHub status (attempt {self._runninghub_fail_count}), using local database as fallback")
                 

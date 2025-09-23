@@ -65,7 +65,7 @@ class TaskStatusService:
                     
                     # 如果任务状态变更为RUNNING，设置超时时间
                     if new_status == 'RUNNING' and hasattr(task, 'timeout_at'):
-                        timeout_minutes = current_app.config.get('TASK_TIMEOUT_MINUTES', 30)
+                        timeout_minutes = current_app.config.get('TASK_TIMEOUT_MINUTES', 600)
                         task.timeout_at = datetime.utcnow() + timedelta(minutes=timeout_minutes)
                     
                     # 如果任务完成，记录完成时间

@@ -147,7 +147,7 @@ def create_task():
                         # 绝对不能将base64数据存储到数据库中
                         from flask import current_app
                         current_app.logger.error(f"File upload failed for node {node_data['node_id']} (type: {node.node_type}): {e}")
-                        return jsonify({'error': f'File upload failed for node {node_data["node_id"]}: {str(e)}'}), 500
+                        return jsonify({'error': f"File upload failed for node {node_data['node_id']}: {str(e)}"}), 500
             
             # 创建任务数据记录
             task_data = TaskData(
@@ -160,7 +160,20 @@ def create_task():
     
     db.session.commit()
     
-    return jsonify(task.to_dict()), 201
+    # 支持创建后自动启动
+    auto_start = data.get('auto_start', False)
+    task_dict = task.to_dict()
+    if auto_start:
+        try:
+            success, message = task_controller.start_single_task(task_id)
+            task_dict['auto_start_success'] = success
+            task_dict['auto_start_message'] = message
+        except Exception as e:
+            # 启动失败不影响创建返回
+            task_dict['auto_start_success'] = False
+            task_dict['auto_start_message'] = f"自动启动失败: {str(e)}"
+    
+    return jsonify(task_dict), 201
 
 @bp.route('/<task_id>', methods=['GET'])
 def get_task(task_id):

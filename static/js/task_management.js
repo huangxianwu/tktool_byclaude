@@ -416,10 +416,10 @@ class TaskManager {
         const canStop = ['PENDING', 'QUEUED', 'RUNNING'].includes(task.status);
         
         return `
-            <tr data-task-id=\"${task.task_id}\">
+            <tr data-task-id="${task.task_id}">
                 <td>
-                    <input type=\"checkbox\" class=\"task-checkbox\" value=\"${task.task_id}\" 
-                           onchange=\"taskManager.toggleTaskSelection('${task.task_id}')\">
+                    <input type="checkbox" class="task-checkbox" value="${task.task_id}" 
+                           onchange="taskManager.toggleTaskSelection('${task.task_id}')">
                 </td>
                 <td>
                     <code class="task-id" ondblclick="copyToClipboard('${task.task_id}')" title="双击复制完整ID">${task.task_id.substring(0, 8)}...</code>
@@ -452,6 +452,7 @@ class TaskManager {
                         ${canStart ? `<button class=\"btn btn-success\" onclick=\"taskManager.startTask('${task.task_id}')\">启动</button>` : ''}
                         ${canStop ? `<button class=\"btn btn-warning\" onclick=\"taskManager.stopTask('${task.task_id}')\">停止</button>` : ''}
                         <button class=\"btn btn-secondary\" onclick=\"taskManager.showTaskDetail('${task.task_id}')\">详情</button>
+                        <a class=\"btn btn-secondary\" href=\"/tasks/create/${task.workflow_id}?copyFrom=${task.task_id}\">复制</a>
                         <button class=\"btn btn-danger\" onclick=\"taskManager.deleteTask('${task.task_id}')\">删除</button>
                     </div>
                 </td>
