@@ -95,8 +95,9 @@ class DataCompensationService:
             if dry_run:
                 return True, f"试运行: 将创建{len(outputs)}个TaskOutput记录", len(outputs)
             
-            # 创建TaskOutput记录
+            # 创建TaskOutput记录（Remote-only模式：仅远程链接）
             created_count = 0
+            skipped_count = 0
             creation_time = now_utc()
             
             for i, output in enumerate(outputs):
@@ -109,6 +110,7 @@ class DataCompensationService:
                     file_url = output.get('fileUrl', '').strip()
                     node_id = output.get('nodeId', f'node_{i}').strip()
                     file_type = output.get('fileType', 'png').strip()
+                    file_size = output.get('fileSize', 0)
                     
                     if not file_url:
                         print(f"  ⚠️ 跳过空fileUrl的output[{i}]")
@@ -125,48 +127,46 @@ class DataCompensationService:
                     else:
                         file_name = f'compensated_{i}_{creation_time.strftime("%Y%m%d_%H%M%S")}.{file_type}'
                     
-                    # 再次检查是否已存在（防止并发创建）
-                    existing_output = TaskOutput.query.filter_by(
-                        task_id=task.task_id,
-                        node_id=node_id,
-                        file_url=file_url
-                    ).first()
-                    
-                    if existing_output:
-                        print(f"  ℹ️ TaskOutput记录已存在: {node_id} - {file_name}")
-                        created_count += 1
-                        continue
-                    
-                    # 创建新的TaskOutput记录
+                    # 创建新的TaskOutput记录（Remote-only模式：仅远程链接）
                     task_output = TaskOutput(
                         task_id=task.task_id,
                         node_id=node_id,
                         name=file_name,
                         file_url=file_url,
-                        local_path='',  # 远程模式下本地路径为空
-                        thumbnail_path='',  # 远程模式下缩略图路径为空
+                        local_path=None,  # Remote-only模式：不保存本地路径
+                        thumbnail_path=None,  # Remote-only模式：不保存缩略图路径
                         file_type=file_type,
-                        file_size=0,  # 远程模式下文件大小暂时为0
+                        file_size=file_size if isinstance(file_size, int) and file_size > 0 else 0,
                         created_at=creation_time  # 使用补偿时间
                     )
-                    db.session.add(task_output)
-                    created_count += 1
                     
-                    print(f"  ✅ 创建TaskOutput记录: {node_id} - {file_name}")
+                    # 使用数据库唯一约束实现幂等写入
+                    try:
+                        db.session.add(task_output)
+                        db.session.flush()  # 立即检查约束冲突
+                        created_count += 1
+                        print(f"  ✅ 创建远程索引记录: {node_id} - {file_name}")
+                        
+                    except Exception as ie:
+                        # 唯一约束冲突或其他错误，回滚当前记录
+                        db.session.rollback()
+                        skipped_count += 1
+                        print(f"  ℹ️ 远程索引记录已存在或创建失败（幂等跳过）: {node_id} - {file_name}")
+                        continue
                     
                 except Exception as output_error:
-                    print(f"  ⚠️ 创建单个TaskOutput记录失败[{i}]: {str(output_error)}")
+                    print(f"  ⚠️ 处理单个输出记录失败[{i}]: {str(output_error)}")
                     continue
             
             # 提交数据库事务
-            if created_count > 0:
+            if created_count > 0 or skipped_count > 0:
                 db.session.commit()
                 self.compensation_stats['successfully_compensated'] += 1
-                return True, f"成功创建{created_count}个TaskOutput记录", created_count
+                return True, f"远程索引库补偿完成：新建{created_count}个，跳过{skipped_count}个", created_count
             else:
                 db.session.rollback()
                 self.compensation_stats['failed_compensation'] += 1
-                return False, "没有创建任何TaskOutput记录", 0
+                return False, "没有创建任何远程索引记录", 0
                 
         except Exception as e:
             # 回滚数据库事务

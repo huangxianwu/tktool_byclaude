@@ -92,13 +92,15 @@ class TaskQueueManager:
                         if task_data:
                             task_data.file_url = output['fileUrl']
                     
-                    # 创建TaskOutput记录（远程模式下也需要创建记录用于前端显示）
+                    # 创建TaskOutput记录作为远程索引库（Link-only）
                     task_output_success = False
                     created_outputs_count = 0
+                    skipped_outputs_count = 0
                     
                     try:
                         from app.models.TaskOutput import TaskOutput
                         from datetime import datetime
+                        from sqlalchemy.exc import IntegrityError
                         
                         # 验证outputs数据完整性
                         if not outputs or not isinstance(outputs, list):
@@ -107,7 +109,7 @@ class TaskQueueManager:
                         # 记录开始创建TaskOutput的时间
                         from app.utils.timezone_helper import now_utc
                         creation_start_time = now_utc()
-                        self.runninghub_service._log(task_id, f"🔄 开始创建TaskOutput记录，共{len(outputs)}个输出文件")
+                        self.runninghub_service._log(task_id, f"🔄 开始创建远程索引库记录，共{len(outputs)}个输出文件")
                         
                         for i, output in enumerate(outputs):
                             try:
@@ -119,6 +121,7 @@ class TaskQueueManager:
                                 file_url = output.get('fileUrl', '').strip()
                                 node_id = output.get('nodeId', f'node_{i}').strip()
                                 file_type = output.get('fileType', 'png').strip()
+                                file_size = output.get('fileSize', 0)
                                 
                                 # 验证必要字段
                                 if not file_url:
@@ -137,50 +140,49 @@ class TaskQueueManager:
                                 else:
                                     file_name = f'output_{i}_{creation_start_time.strftime("%Y%m%d_%H%M%S")}.{file_type}'
                                 
-                                # 检查是否已存在相同的TaskOutput记录（增强去重逻辑）
-                                existing_output = TaskOutput.query.filter_by(
-                                    task_id=task_id,
-                                    node_id=node_id,
-                                    file_url=file_url
-                                ).first()
-                                
-                                if existing_output:
-                                    self.runninghub_service._log(task_id, f"ℹ️ TaskOutput记录已存在: {node_id} - {file_name}")
-                                    created_outputs_count += 1  # 已存在的也算作成功
-                                    continue
-                                
-                                # 创建新的TaskOutput记录
+                                # 创建新的TaskOutput记录（Remote-only模式：仅远程链接）
                                 task_output = TaskOutput(
                                     task_id=task_id,
                                     node_id=node_id,
                                     name=file_name,
                                     file_url=file_url,
-                                    local_path='',  # 远程模式下本地路径为空
-                                    thumbnail_path='',  # 远程模式下缩略图路径为空
+                                    local_path=None,  # Remote-only模式：不保存本地路径
+                                    thumbnail_path=None,  # Remote-only模式：不保存缩略图路径
                                     file_type=file_type,
-                                    file_size=0,  # 远程模式下文件大小暂时为0
-                                    created_at=creation_start_time  # 使用统一的创建时间
+                                    file_size=file_size if isinstance(file_size, int) and file_size > 0 else 0,
+                                    created_at=creation_start_time
                                 )
-                                db.session.add(task_output)
-                                created_outputs_count += 1
                                 
-                                self.runninghub_service._log(task_id, f"✅ 创建TaskOutput记录: {node_id} - {file_name}")
+                                # 使用数据库唯一约束实现幂等写入
+                                try:
+                                    db.session.add(task_output)
+                                    db.session.flush()  # 立即检查约束冲突
+                                    created_outputs_count += 1
+                                    self.runninghub_service._log(task_id, f"✅ 创建远程索引记录: {node_id} - {file_name}")
+                                    
+                                except IntegrityError as ie:
+                                    # 唯一约束冲突，说明记录已存在（幂等）
+                                    db.session.rollback()
+                                    skipped_outputs_count += 1
+                                    self.runninghub_service._log(task_id, f"ℹ️ 远程索引记录已存在（幂等跳过）: {node_id} - {file_name}")
+                                    continue
                                 
                             except Exception as output_error:
-                                self.runninghub_service._log(task_id, f"⚠️ 创建单个TaskOutput记录失败[{i}]: {str(output_error)}")
+                                self.runninghub_service._log(task_id, f"⚠️ 处理单个输出记录失败[{i}]: {str(output_error)}")
                                 # 继续处理下一个output，不中断整个流程
                                 continue
                         
                         # 提交数据库事务
-                        if created_outputs_count > 0:
+                        if created_outputs_count > 0 or skipped_outputs_count > 0:
                             db.session.commit()
                             task_output_success = True
                             creation_end_time = now_utc()
                             duration = (creation_end_time - creation_start_time).total_seconds()
-                            self.runninghub_service._log(task_id, f"✅ 成功创建{created_outputs_count}个TaskOutput记录，耗时{duration:.2f}秒")
+                            self.runninghub_service._log(task_id, 
+                                f"✅ 远程索引库更新完成：新建{created_outputs_count}个，跳过{skipped_outputs_count}个，耗时{duration:.2f}秒")
                         else:
                             db.session.rollback()
-                            self.runninghub_service._log(task_id, f"⚠️ 没有创建任何TaskOutput记录")
+                            self.runninghub_service._log(task_id, f"⚠️ 没有创建任何远程索引记录")
                             
                     except Exception as e:
                         # 回滚数据库事务
@@ -189,7 +191,7 @@ class TaskQueueManager:
                         except:
                             pass
                         
-                        error_msg = f"创建TaskOutput记录失败: {str(e)}"
+                        error_msg = f"创建远程索引库记录失败: {str(e)}"
                         self.runninghub_service._log(task_id, f"❌ {error_msg}")
                         
                         # 记录详细的错误信息用于调试

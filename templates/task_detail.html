@@ -459,9 +459,11 @@ async function renderResults(data) {
 function createResultCard(output) {
     const isImage = output.file_type && output.file_type.toLowerCase().match(/^(png|jpg|jpeg|gif|bmp|webp)$/);
     const isVideo = output.file_type && output.file_type.toLowerCase().match(/^(mp4|avi|mov|wmv|flv|webm)$/);
+    const isAudio = output.file_type && output.file_type.toLowerCase().match(/^(mp3|wav|ogg|aac|flac|m4a)$/);
     
     // 统一获取文件URL，支持多种字段名
-    const fileUrl = output.static_url || output.url || output.file_url || '';
+    // Remote-only 模式：优先使用远程直链 file_url
+        const fileUrl = output.file_url || output.url || output.static_url || '';
     
     let cardContent = '';
     let previewContent = '';
@@ -499,6 +501,33 @@ function createResultCard(output) {
                 </div>
                 <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
                     <i class="fas fa-video mr-1"></i>视频
+                </div>
+            </div>
+        `;
+    } else if (isAudio) {
+        // 音频文件预览和播放
+        previewContent = `
+            <div class="audio-preview-card relative cursor-pointer" onclick="playAudio(this)">
+                <div class="flex items-center justify-center h-48 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mb-4 mx-auto shadow-lg">
+                            <i class="fas fa-music text-white text-2xl"></i>
+                        </div>
+                        <div class="text-lg font-medium text-gray-700 mb-2">点击播放音频</div>
+                        <div class="text-sm text-gray-500">${output.file_type ? output.file_type.toUpperCase() : 'AUDIO'}</div>
+                    </div>
+                </div>
+                <audio preload="none" class="hidden">
+                    <source src="${fileUrl}" type="audio/${output.file_type || 'mpeg'}">
+                    您的浏览器不支持音频播放。
+                </audio>
+                <div class="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+                    <i class="fas fa-music mr-1"></i>音频
+                </div>
+                <div class="play-status absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 transition-opacity duration-200 rounded-lg">
+                    <div class="bg-white bg-opacity-90 text-gray-800 p-3 rounded-full shadow-lg">
+                        <i class="fas fa-play text-xl ml-1"></i>
+                    </div>
                 </div>
             </div>
         `;
@@ -1292,6 +1321,51 @@ function playVideo(overlay) {
             console.error('视频播放失败:', error);
             showVideoError(video);
         });
+    }
+}
+
+// 音频播放函数
+function playAudio(audioCard) {
+    const audio = audioCard.querySelector('audio');
+    const playStatus = audioCard.querySelector('.play-status');
+    const playIcon = playStatus.querySelector('i');
+    
+    if (audio) {
+        if (audio.paused) {
+            // 暂停其他正在播放的音频
+            document.querySelectorAll('.audio-preview-card audio').forEach(otherAudio => {
+                if (otherAudio !== audio && !otherAudio.paused) {
+                    otherAudio.pause();
+                    // 重置其他音频卡片的状态
+                    const otherCard = otherAudio.closest('.audio-preview-card');
+                    const otherPlayStatus = otherCard.querySelector('.play-status');
+                    const otherIcon = otherPlayStatus.querySelector('i');
+                    otherPlayStatus.style.opacity = '0';
+                    otherIcon.className = 'fas fa-play text-xl ml-1';
+                }
+            });
+            
+            // 播放当前音频
+            audio.play().then(() => {
+                playStatus.style.opacity = '1';
+                playIcon.className = 'fas fa-pause text-xl';
+                
+                // 监听音频结束事件
+                audio.addEventListener('ended', function() {
+                    playStatus.style.opacity = '0';
+                    playIcon.className = 'fas fa-play text-xl ml-1';
+                }, { once: true });
+                
+            }).catch(error => {
+                 console.error('音频播放失败:', error);
+                 showDownloadNotification('音频播放失败，请检查文件格式', 'error');
+             });
+        } else {
+            // 暂停音频
+            audio.pause();
+            playStatus.style.opacity = '0';
+            playIcon.className = 'fas fa-play text-xl ml-1';
+        }
     }
 }
 

@@ -9,12 +9,11 @@ bp = Blueprint('outputs', __name__, url_prefix='/api')
 
 @bp.route('/outputs', methods=['GET'])
 def get_all_outputs():
-    """获取所有输出结果"""
+    """获取所有输出结果 - 仅使用数据库查询，支持筛选排序分页"""
     try:
         from app.models import Task, Workflow
-        from app.services.file_manager import FileManager
-        import os
-        from datetime import datetime
+        from sqlalchemy import and_, or_, desc, asc
+        from datetime import datetime, timedelta
         
         # 获取筛选参数
         workflow_id = request.args.get('workflow')
@@ -25,61 +24,85 @@ def get_all_outputs():
         page = int(request.args.get('page', 1))
         page_size = int(request.args.get('pageSize', 20))
         
-        file_manager = FileManager()
-        
-        # 获取所有已完成的任务
-        query = Task.query.filter_by(status='SUCCESS')
+        # 构建基础查询 - 联表查询 TaskOutput, Task, Workflow
+        query = TaskOutput.query.join(Task, TaskOutput.task_id == Task.task_id)\
+                                .join(Workflow, Task.workflow_id == Workflow.workflow_id)\
+                                .filter(Task.status == 'SUCCESS')
         
         # 工作流筛选
         if workflow_id:
-            query = query.filter_by(workflow_id=workflow_id)
+            query = query.filter(Task.workflow_id == workflow_id)
         
-        tasks = query.all()
-        all_outputs = []
+        # 文件类型筛选
+        if file_type:
+            query = query.filter(TaskOutput.file_type == file_type)
         
-        for task in tasks:
-            try:
-                # 直接从TaskOutput表获取任务的输出文件
-                task_outputs = TaskOutput.query.filter_by(task_id=task.task_id).all()
-                
-                # 获取工作流信息
-                workflow = Workflow.query.get(task.workflow_id)
-                workflow_name = workflow.name if workflow else '未知工作流'
-                
-                for output in task_outputs:
-                    # 构建输出结果对象
-                    output_item = {
-                        'id': f"{task.task_id}_{output.name}",
-                        'filename': output.name,
-                        'file_path': output.file_url or output.local_path,
-                        'file_size': 0,  # TaskOutput表中没有文件大小信息
-                        'task_id': task.task_id,
-                        'task_description': task.task_description or '',
-                        'workflow_id': task.workflow_id,
-                        'workflow_name': workflow_name,
-                        'created_at': output.created_at.isoformat() if output.created_at else task.created_at.isoformat(),
-                        'thumbnail_path': '',
-                        'file_type': get_file_type_from_name(output.name)
-                    }
-                    all_outputs.append(output_item)
-            except Exception as e:
-                current_app.logger.warning(f"Failed to get outputs for task {task.task_id}: {e}")
-                continue
+        # 时间范围筛选
+        if time_range:
+            now = datetime.now()
+            if time_range == 'today':
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_range == 'week':
+                start_date = now - timedelta(days=7)
+            elif time_range == 'month':
+                start_date = now - timedelta(days=30)
+            else:
+                start_date = None
+            
+            if start_date:
+                query = query.filter(TaskOutput.created_at >= start_date)
         
-        # 应用筛选
-        filtered_outputs = apply_output_filters(all_outputs, file_type, time_range, search)
+        # 搜索筛选 - 支持任务描述、工作流名称、文件名搜索
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    TaskOutput.name.ilike(search_pattern),
+                    Task.task_id.ilike(search_pattern),
+                    Task.task_description.ilike(search_pattern),
+                    Workflow.name.ilike(search_pattern)
+                )
+            )
         
         # 排序
-        filtered_outputs = sort_outputs(filtered_outputs, sort_by)
+        if sort_by == 'created_at_desc':
+            query = query.order_by(desc(TaskOutput.created_at))
+        elif sort_by == 'created_at_asc':
+            query = query.order_by(asc(TaskOutput.created_at))
+        elif sort_by == 'size_desc':
+            query = query.order_by(desc(TaskOutput.file_size))
+        elif sort_by == 'size_asc':
+            query = query.order_by(asc(TaskOutput.file_size))
+        else:
+            query = query.order_by(desc(TaskOutput.created_at))
         
-        # 分页
-        total_count = len(filtered_outputs)
-        start_index = (page - 1) * page_size
-        end_index = start_index + page_size
-        page_outputs = filtered_outputs[start_index:end_index]
+        # 分页查询
+        total_count = query.count()
+        outputs_query = query.offset((page - 1) * page_size).limit(page_size)
+        
+        # 构建返回结果
+        outputs = []
+        for output in outputs_query:
+            task = output.task
+            workflow = task.workflow
+            
+            output_item = {
+                'id': f"{task.task_id}_{output.name}",
+                'filename': output.name,
+                'file_path': output.file_url,  # Remote-only 模式只使用 file_url
+                'file_size': output.file_size or 0,
+                'task_id': task.task_id,
+                'task_description': task.task_description or '',
+                'workflow_id': task.workflow_id,
+                'workflow_name': workflow.name if workflow else '未知工作流',
+                'created_at': output.created_at.isoformat() if output.created_at else task.created_at.isoformat(),
+                'thumbnail_path': output.thumbnail_path or '',  # 使用缩略图路径
+                'file_type': output.file_type or get_file_type_from_name(output.name)
+            }
+            outputs.append(output_item)
         
         return jsonify({
-            'outputs': page_outputs,
+            'outputs': outputs,
             'total': total_count,
             'page': page,
             'pageSize': page_size,
@@ -186,30 +209,126 @@ bp_tasks = Blueprint('outputs_tasks', __name__, url_prefix='/api/tasks')
 
 @bp_tasks.route('/<task_id>/outputs', methods=['GET'])
 def get_task_outputs(task_id):
-    """获取任务的输出文件列表"""
+    """获取任务的输出文件列表 - 优先 TaskOutput，缺失时调用 RunningHub 并可选幂等回写"""
     try:
-        file_manager = FileManager()
+        # 首先查询 TaskOutput 表
+        task_outputs = TaskOutput.query.filter_by(task_id=task_id).all()
         
-        # 根据配置决定使用远程模式还是传统模式
-        remote_only_mode = current_app.config.get('REMOTE_ONLY_MODE', False)
+        if task_outputs:
+            # 如果有 TaskOutput 记录，直接返回
+            outputs = []
+            for output in task_outputs:
+                output_item = {
+                    'id': output.id,
+                    'name': output.name,
+                    'url': output.file_url,
+                    'node_id': output.node_id,
+                    'file_url': output.file_url,
+                    'file_type': output.file_type,
+                    'file_size': output.file_size,
+                    'thumbnail_url': output.thumbnail_url,
+                    'source': 'database',
+                    'is_local': False,
+                    'created_at': output.created_at.isoformat() if output.created_at else None
+                }
+                outputs.append(output_item)
+            return jsonify(outputs)
         
-        if remote_only_mode:
-            # 纯远程模式：只显示远程文件
-            outputs = file_manager.get_remote_task_outputs(task_id)
-        else:
-            # 传统模式：根据配置决定是否自动下载
-            show_remote_only = current_app.config.get('SHOW_REMOTE_FILES_ONLY', True)
-            auto_download = current_app.config.get('AUTO_DOWNLOAD_ON_SUCCESS', False)
+        # 如果没有 TaskOutput 记录，回退到 RunningHub
+        from app.models.Task import Task
+        task = Task.query.get(task_id)
+        if not task or not task.runninghub_task_id:
+            return jsonify([])
+        
+        try:
+            from app.services.runninghub import RunningHubService
+            runninghub_service = RunningHubService()
+            remote_outputs = runninghub_service.get_task_outputs(task.runninghub_task_id)
             
-            if show_remote_only:
-                # 只显示远程文件，不自动下载
-                outputs = file_manager.get_task_outputs_with_fallback(task_id, auto_download=False)
-            else:
-                # 优先显示本地文件，根据配置决定是否自动下载
-                outputs = file_manager.get_task_outputs_with_fallback(task_id, auto_download=auto_download)
+            if not remote_outputs:
+                return jsonify([])
+            
+            # 检查是否开启回写功能
+            backfill_enabled = current_app.config.get('BACKFILL_ON_FALLBACK', True)
+            
+            if backfill_enabled:
+                # 幂等回写到 TaskOutput
+                from app import db
+                from datetime import datetime
+                
+                for i, output in enumerate(remote_outputs):
+                    file_url = output.get('url', '')
+                    file_name = output.get('name', f'output_{i}.file')
+                    file_size = output.get('size', 0)
+                    node_id = output.get('nodeId', f'node_{i}')
+                    
+                    if file_url:  # 只有有效的 file_url 才写入
+                        try:
+                            # 幂等检查：基于 task_id + node_id + file_url 的唯一约束
+                            existing = TaskOutput.query.filter_by(
+                                task_id=task_id,
+                                node_id=node_id,
+                                file_url=file_url
+                            ).first()
+                            
+                            if not existing:
+                                # 推断文件类型
+                                file_type = get_file_type_from_name(file_name)
+                                
+                                task_output = TaskOutput(
+                                    task_id=task_id,
+                                    node_id=node_id,
+                                    name=file_name,
+                                    file_url=file_url,
+                                    file_type=file_type,
+                                    file_size=file_size,
+                                    local_path=None,  # Remote-only 模式不保存本地路径
+                                    thumbnail_path=None,  # Remote-only 模式不保存本地缩略图
+                                    thumbnail_url=output.get('thumbnail_url'),  # 保存远程缩略图URL
+                                    created_at=datetime.utcnow()
+                                )
+                                db.session.add(task_output)
+                        except Exception as e:
+                            current_app.logger.warning(f"Failed to backfill TaskOutput for {task_id}: {e}")
+                            continue
+                
+                try:
+                    db.session.commit()
+                    current_app.logger.info(f"Successfully backfilled TaskOutput records for task {task_id}")
+                except Exception as e:
+                    db.session.rollback()
+                    current_app.logger.error(f"Failed to commit TaskOutput backfill for task {task_id}: {e}")
+            
+            # 格式化返回结果
+            result = []
+            for i, output in enumerate(remote_outputs):
+                file_url = output.get('url', '')
+                file_name = output.get('name', f'output_{i}.file')
+                file_size = output.get('size', 0)
+                node_id = output.get('nodeId', f'node_{i}')
+                
+                result.append({
+                    'id': f"{task_id}_{node_id}",
+                    'name': file_name,
+                    'url': file_url,
+                    'node_id': node_id,
+                    'file_url': file_url,
+                    'file_type': get_file_type_from_name(file_name),
+                    'file_size': file_size,
+                    'thumbnail_url': output.get('thumbnail_url', ''),
+                    'source': 'runninghub',
+                    'is_local': False,
+                    'created_at': None
+                })
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to fetch outputs from RunningHub for task {task_id}: {e}")
+            return jsonify({'error': f'Failed to fetch remote outputs: {str(e)}'}), 500
         
-        return jsonify(outputs)
     except Exception as e:
+        current_app.logger.error(f"Error getting task outputs for {task_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @bp_tasks.route('/<task_id>/generate-filename', methods=['POST'])

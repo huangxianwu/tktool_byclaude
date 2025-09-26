@@ -127,7 +127,9 @@ class TaskManager {
             // 处理排序参数
             const [sortBy, sortOrder] = this.filters.sort.split('_');
             params.append('sort_by', sortBy);
-            params.append('sort_order', sortOrder);
+            if (sortOrder) {
+                params.append('sort_order', sortOrder);
+            }
             
             const url = `/api/tasks${params.toString() ? '?' + params.toString() : ''}`;
             const response = await fetch(url);
