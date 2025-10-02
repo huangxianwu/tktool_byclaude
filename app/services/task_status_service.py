@@ -6,8 +6,11 @@ from datetime import datetime, timedelta
 from flask import current_app
 from app import db
 from app.models.Task import Task
+from app.models.TaskLog import TaskLog
+from app.models.TaskOutput import TaskOutput
 from app.services.runninghub import RunningHubService
 from app.services.central_queue_manager import central_queue_manager, TriggerSource
+from app.utils.timezone_helper import now_utc
 import logging
 import threading
 import time
@@ -91,6 +94,10 @@ class TaskStatusService:
                         )
                         db.session.add(complete_log)
                         db.session.commit()
+                        
+                        # 如果任务成功完成，自动获取并保存输出文件信息
+                        if new_status == 'SUCCESS':
+                            self._auto_fetch_task_outputs(task_id)
                         
                         # 任务完成后，通过中央管理器触发队列处理
                         central_queue_manager.request_queue_processing(
@@ -307,3 +314,102 @@ class TaskStatusService:
         except Exception as e:
             logger.error(f"Error downloading task output {output_name} for {task_id}: {e}")
             return None
+    
+    def _auto_fetch_task_outputs(self, task_id):
+        """任务完成时自动获取并保存输出文件信息到TaskOutput表"""
+        try:
+            task = Task.query.get(task_id)
+            if not task or not task.runninghub_task_id:
+                logger.warning(f"Task {task_id} not found or missing runninghub_task_id")
+                return
+            
+            # 获取任务输出文件
+            outputs = self.runninghub_service.get_outputs(task.runninghub_task_id, task_id)
+            
+            if not outputs:
+                logger.info(f"No outputs found for task {task_id}")
+                return
+            
+            # 创建TaskOutput记录
+            from app.models.TaskOutput import TaskOutput
+            from app.utils.timezone_helper import now_utc
+            from sqlalchemy.exc import IntegrityError
+            import os
+            
+            created_count = 0
+            skipped_count = 0
+            
+            for output in outputs:
+                try:
+                    # 提取文件信息
+                    node_id = output.get('nodeId', '')
+                    file_url = output.get('fileUrl', '')
+                    file_type = output.get('fileType', '')
+                    file_size = output.get('fileSize', 0)
+                    
+                    if not file_url:
+                        continue
+                    
+                    # 从URL中提取文件名
+                    file_name = os.path.basename(file_url.split('?')[0])
+                    
+                    # 创建TaskOutput记录
+                    task_output = TaskOutput(
+                        task_id=task_id,
+                        node_id=node_id,
+                        name=file_name,
+                        file_type=file_type,
+                        file_size=file_size,
+                        file_url=file_url,
+                        thumbnail_path=None,
+                        created_at=now_utc()
+                    )
+                    
+                    db.session.add(task_output)
+                    db.session.flush()  # 检查约束冲突
+                    created_count += 1
+                    
+                    logger.info(f"Created TaskOutput record for task {task_id}, node {node_id}: {file_name}")
+                    
+                except IntegrityError:
+                    # 记录已存在，跳过
+                    db.session.rollback()
+                    skipped_count += 1
+                    logger.debug(f"TaskOutput record already exists for task {task_id}, node {node_id}")
+                    continue
+                except Exception as e:
+                    logger.error(f"Error creating TaskOutput record for task {task_id}: {e}")
+                    continue
+            
+            # 提交事务
+            if created_count > 0:
+                db.session.commit()
+                
+                # 记录成功日志
+                success_log = TaskLog(
+                    task_id=task_id,
+                    message=f"✅ 自动获取输出文件完成：新建{created_count}个记录，跳过{skipped_count}个"
+                )
+                db.session.add(success_log)
+                db.session.commit()
+                
+                logger.info(f"Auto-fetched outputs for task {task_id}: created {created_count}, skipped {skipped_count}")
+            else:
+                db.session.rollback()
+                logger.info(f"No new TaskOutput records created for task {task_id}")
+                
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except:
+                pass
+            
+            # 记录错误日志
+            error_log = TaskLog(
+                task_id=task_id,
+                message=f"❌ 自动获取输出文件失败: {str(e)}"
+            )
+            db.session.add(error_log)
+            db.session.commit()
+            
+            logger.error(f"Error auto-fetching outputs for task {task_id}: {e}")

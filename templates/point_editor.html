@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block page_title %}点集编辑器{% endblock %}
+{% block content %}
+<div class="grid grid-cols-12 gap-6">
+  <!-- 左侧：画布与工具栏 -->
+  <div class="col-span-12 lg:col-span-9 space-y-4">
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center space-x-2">
+          <button id="tool-positive" class="px-3 py-2 rounded bg-green-500 text-white hover:bg-green-600" title="正样本 (P)">正样本</button>
+          <button id="tool-negative" class="px-3 py-2 rounded bg-red-500 text-white hover:bg-red-600" title="负样本 (N)">负样本</button>
+          <button id="tool-move" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" title="平移 (Space/中键)">平移</button>
+          <button id="tool-zoomfit" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" title="适配窗口 (F)">适配</button>
+          <button id="tool-clear" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" title="清空 (Shift+Delete)">清空</button>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="tool-undo" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" title="撤销 (Cmd/Ctrl+Z)"><i class="fas fa-undo"></i></button>
+          <button id="tool-redo" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" title="重做 (Cmd/Ctrl+Shift+Z)"><i class="fas fa-redo"></i></button>
+          <button id="tool-load-image" class="px-3 py-2 rounded bg-primary text-white hover:bg-blue-600" title="选择图片 (JPG/PNG)">选择图片</button>
+          <input id="image-file" type="file" accept="image/png,image/jpeg" class="hidden" />
+          <button id="tool-export" class="px-3 py-2 rounded bg-blue-500 text-white hover:bg-blue-600" title="导出 (E)">导出</button>
+          <input id="file-import" type="file" accept="application/json" class="hidden" />
+          <button id="tool-import" class="px-3 py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" title="导入 (I)">导入</button>
+        </div>
+      </div>
+      <div id="canvas-container" class="relative border rounded-lg overflow-hidden bg-gray-100" style="height: 70vh; min-height: 420px;">
+        <canvas id="point-canvas" class="w-full h-full block"></canvas>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">提示：选择或拖拽 JPG/PNG 图片到上方区域进行加载；左键添加点，拖拽移动；删除：选中后按 Delete；缩放：滚轮；平移：按住空格或中键拖拽；触摸：双指缩放，单指拖拽；导入/导出为与 ComfyUI 兼容的像素坐标（保留高精度小数）。</p>
+    </div>
+  </div>
+
+  <!-- 右侧：数据与属性 -->
+  <div class="col-span-12 lg:col-span-3 space-y-4">
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="font-semibold text-gray-800 mb-2">当前图片</h3>
+      <div class="text-sm text-gray-600 space-y-1">
+        <div>分辨率：<span id="meta-size">-</span></div>
+        <div>缩放：<span id="meta-zoom">100%</span></div>
+        <div>视图原点：<span id="meta-origin">(0, 0)</span></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="font-semibold text-gray-800 mb-2">点数据</h3>
+      <textarea id="json-output" class="w-full h-48 border rounded p-2 text-xs font-mono" readonly></textarea>
+      <div class="mt-2 flex items-center space-x-2">
+        <button id="btn-copy" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm">复制</button>
+        <label class="text-sm text-gray-500"><input id="normalize-toggle" type="checkbox" class="mr-1">导出为归一化坐标 [0,1]</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/point_editor.js') }}"></script>
+{% endblock %}

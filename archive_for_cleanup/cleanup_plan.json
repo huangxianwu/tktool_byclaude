@@ -1,0 +1,199 @@
+{
+  "summary": {
+    "total_files": 30,
+    "total_size_mb": 103.14,
+    "definitely_remove_count": 8,
+    "probably_remove_count": 10,
+    "review_required_count": 12,
+    "analysis_date": "2025-10-02T11:15:52.157974"
+  },
+  "cleanup_candidates": {
+    "definitely_remove": [
+      {
+        "path": ".DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "category": "system_file",
+        "size": 6148
+      },
+      {
+        "path": ".sync-meta.json",
+        "reason": "系统生成文件: .sync-meta.json",
+        "category": "system_file",
+        "size": 265
+      },
+      {
+        "path": "temp/.DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "category": "system_file",
+        "size": 6148
+      },
+      {
+        "path": "static/outputs/videos/.DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "category": "system_file",
+        "size": 8196
+      },
+      {
+        "path": "app.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "category": "empty_database",
+        "size": 0
+      },
+      {
+        "path": "task_manager.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "category": "empty_database",
+        "size": 0
+      },
+      {
+        "path": "tasks.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "category": "empty_database",
+        "size": 0
+      },
+      {
+        "path": "debug_source_display.js",
+        "reason": "空的调试JS文件",
+        "category": "empty_debug",
+        "size": 0
+      }
+    ],
+    "probably_remove": [
+      {
+        "path": "temp/.DS_Store",
+        "reason": "临时目录中的其他文件",
+        "category": "temp_other",
+        "size": 6148
+      },
+      {
+        "path": "temp/doc/TEMP_PROJECT_RULES.md",
+        "reason": "临时目录中的其他文件",
+        "category": "temp_other",
+        "size": 5575
+      },
+      {
+        "path": "temp/doc/黑帽男+1&2.mp4",
+        "reason": "临时目录中的大型视频文件 (9.8MB)",
+        "category": "large_media",
+        "size": 10324515
+      },
+      {
+        "path": "temp/doc/9月10日-煤气罐-片段集-3.mp4",
+        "reason": "临时目录中的大型视频文件 (11.9MB)",
+        "category": "large_media",
+        "size": 12485672
+      },
+      {
+        "path": "temp/doc/26125534357-1-192.mp4",
+        "reason": "临时目录中的大型视频文件 (31.7MB)",
+        "category": "large_media",
+        "size": 33256265
+      },
+      {
+        "path": "temp/doc/遮罩编辑器.md",
+        "reason": "临时目录中的其他文件",
+        "category": "temp_other",
+        "size": 6999
+      },
+      {
+        "path": "tests/debug_runninghub_fieldname_1972135780502159362.py",
+        "reason": "调试文件，可能是临时生成的",
+        "category": "debug_file",
+        "size": 5718
+      },
+      {
+        "path": "app.log",
+        "reason": "日志文件 (51.9KB)",
+        "category": "log_file",
+        "size": 53134
+      },
+      {
+        "path": "scripts/deploy_test.log",
+        "reason": "日志文件 (1.3KB)",
+        "category": "log_file",
+        "size": 1349
+      },
+      {
+        "path": "archive/deprecated/task_create.html.backup",
+        "reason": "备份文件 (包含 .backup)",
+        "category": "backup_file",
+        "size": 36724
+      }
+    ],
+    "review_required": [
+      {
+        "path": "temp/doc/产品图.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 118
+      },
+      {
+        "path": "temp/doc/WanVACE衣服替换_正式版_api.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "category": "temp_config",
+        "size": 13627
+      },
+      {
+        "path": "temp/doc/大妈-白色tshirt.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 1053116
+      },
+      {
+        "path": "temp/doc/产品1.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 830891
+      },
+      {
+        "path": "temp/doc/橄榄绿.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 2779468
+      },
+      {
+        "path": "temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）_api.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "category": "temp_config",
+        "size": 11915
+      },
+      {
+        "path": "temp/doc/模特1.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 1297024
+      },
+      {
+        "path": "temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "category": "temp_config",
+        "size": 95370
+      },
+      {
+        "path": "temp/doc/1962342403615166465-背景替换工作流.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "category": "temp_config",
+        "size": 125383
+      },
+      {
+        "path": "temp/doc/模特图.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "category": "temp_image",
+        "size": 118
+      },
+      {
+        "path": "temp/doc/9月10日-煤气罐-片段集-3.mp4",
+        "reason": "大型视频文件 (11.9MB)",
+        "category": "large_video",
+        "size": 12485672
+      },
+      {
+        "path": "temp/doc/26125534357-1-192.mp4",
+        "reason": "大型视频文件 (31.7MB)",
+        "category": "large_video",
+        "size": 33256265
+      }
+    ],
+    "keep": []
+  }
+}

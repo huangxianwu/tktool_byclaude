@@ -26,7 +26,9 @@ class TaskManager {
         this.init();
     }
     
-    init() {
+    async init() {
+        // 先加载工作流列表，避免后续重复加载
+        await this.loadWorkflows();
         this.loadTasks();
         this.loadQueueStatus();
         this.bindEvents();
@@ -140,7 +142,12 @@ class TaskManager {
             
             this.tasks = await response.json();
             this.filteredTasks = this.tasks; // 直接使用后端筛选的结果
-            await this.loadWorkflows();
+            
+            // 只在工作流列表为空时才加载工作流，避免重复加载导致筛选器重置
+            if (this.workflows.length === 0) {
+                await this.loadWorkflows();
+            }
+            
             this.renderTasks();
             
         } catch (error) {
@@ -165,8 +172,8 @@ class TaskManager {
     
     populateWorkflowFilter() {
         const workflowSelect = document.getElementById('workflow-filter');
-        // 保存当前选中的值
-        const currentValue = workflowSelect.value;
+        // 保存当前的筛选状态（优先使用 this.filters.workflow）
+        const currentFilterValue = this.filters.workflow || workflowSelect.value;
         
         // 清除现有选项（保留第一个"全部工作流"选项）
         while (workflowSelect.children.length > 1) {
@@ -181,9 +188,26 @@ class TaskManager {
             workflowSelect.appendChild(option);
         });
         
-        // 恢复之前选中的值
-        if (currentValue && this.workflows.some(w => w.id == currentValue)) {
-            workflowSelect.value = currentValue;
+        // 恢复筛选状态
+        if (currentFilterValue && this.workflows.some(w => String(w.id) === String(currentFilterValue))) {
+            // 工作流存在于列表中，恢复选中状态
+            workflowSelect.value = currentFilterValue;
+            this.filters.workflow = currentFilterValue;
+        } else if (currentFilterValue && currentFilterValue !== '') {
+            // 工作流不存在于列表中，但用户之前有筛选，保持筛选状态
+            console.warn('Previously selected workflow not found:', currentFilterValue);
+            // 创建一个临时选项来保持筛选状态
+            const tempOption = document.createElement('option');
+            tempOption.value = currentFilterValue;
+            tempOption.textContent = `工作流 ${currentFilterValue} (不存在)`;
+            tempOption.style.color = '#999';
+            workflowSelect.appendChild(tempOption);
+            workflowSelect.value = currentFilterValue;
+            // 保持筛选状态不变
+        } else {
+            // 没有筛选或筛选为空，确保状态同步
+            workflowSelect.value = '';
+            this.filters.workflow = '';
         }
     }
     
@@ -1161,8 +1185,9 @@ class TaskManager {
 let taskManager;
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     taskManager = new TaskManager();
+    await taskManager.init();
 });
 
 // 全局函数（供HTML模板调用）

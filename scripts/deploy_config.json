@@ -1,0 +1,24 @@
+{
+    "remote_branch": "main",
+    "windows_server": "",
+    "webhook_url": "",
+    "auto_push": true,
+    "commit_template": "Deploy: {timestamp}",
+    "backup_before_push": true,
+    "database_sync": {
+        "enabled": false,
+        "sync_method": "manual",
+        "backup_count": 5
+    },
+    "notification": {
+        "enabled": false,
+        "webhook_url": "",
+        "slack_channel": "",
+        "email": ""
+    },
+    "deployment": {
+        "timeout": 300,
+        "retry_count": 3,
+        "health_check_url": "http://localhost:5004/health"
+    }
+}

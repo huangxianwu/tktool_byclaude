@@ -1,0 +1,205 @@
+{
+  "archive_date": "2025-10-02T11:16:09.067056",
+  "moved_files": {
+    "definitely_remove": [
+      {
+        "original_path": ".DS_Store",
+        "archive_path": "archive_for_cleanup/definitely_remove/.DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "size": 6148,
+        "moved_at": "2025-10-02T11:16:09.054180"
+      },
+      {
+        "original_path": ".sync-meta.json",
+        "archive_path": "archive_for_cleanup/definitely_remove/.sync-meta.json",
+        "reason": "系统生成文件: .sync-meta.json",
+        "size": 265,
+        "moved_at": "2025-10-02T11:16:09.054521"
+      },
+      {
+        "original_path": "temp/.DS_Store",
+        "archive_path": "archive_for_cleanup/definitely_remove/temp/.DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "size": 6148,
+        "moved_at": "2025-10-02T11:16:09.054790"
+      },
+      {
+        "original_path": "static/outputs/videos/.DS_Store",
+        "archive_path": "archive_for_cleanup/definitely_remove/static/outputs/videos/.DS_Store",
+        "reason": "系统生成文件: .DS_Store",
+        "size": 8196,
+        "moved_at": "2025-10-02T11:16:09.055065"
+      },
+      {
+        "original_path": "app.db",
+        "archive_path": "archive_for_cleanup/definitely_remove/app.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "size": 0,
+        "moved_at": "2025-10-02T11:16:09.055683"
+      },
+      {
+        "original_path": "task_manager.db",
+        "archive_path": "archive_for_cleanup/definitely_remove/task_manager.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "size": 0,
+        "moved_at": "2025-10-02T11:16:09.056292"
+      },
+      {
+        "original_path": "tasks.db",
+        "archive_path": "archive_for_cleanup/definitely_remove/tasks.db",
+        "reason": "空的数据库文件，实际数据库在instance/目录",
+        "size": 0,
+        "moved_at": "2025-10-02T11:16:09.056939"
+      },
+      {
+        "original_path": "debug_source_display.js",
+        "archive_path": "archive_for_cleanup/definitely_remove/debug_source_display.js",
+        "reason": "空的调试JS文件",
+        "size": 0,
+        "moved_at": "2025-10-02T11:16:09.057530"
+      }
+    ],
+    "probably_remove": [
+      {
+        "original_path": "temp/doc/TEMP_PROJECT_RULES.md",
+        "archive_path": "archive_for_cleanup/probably_remove/temp/doc/TEMP_PROJECT_RULES.md",
+        "reason": "临时目录中的其他文件",
+        "size": 5575,
+        "moved_at": "2025-10-02T11:16:09.057905"
+      },
+      {
+        "original_path": "temp/doc/黑帽男+1&2.mp4",
+        "archive_path": "archive_for_cleanup/probably_remove/temp/doc/黑帽男+1&2.mp4",
+        "reason": "临时目录中的大型视频文件 (9.8MB)",
+        "size": 10324515,
+        "moved_at": "2025-10-02T11:16:09.058301"
+      },
+      {
+        "original_path": "temp/doc/9月10日-煤气罐-片段集-3.mp4",
+        "archive_path": "archive_for_cleanup/probably_remove/temp/doc/9月10日-煤气罐-片段集-3.mp4",
+        "reason": "临时目录中的大型视频文件 (11.9MB)",
+        "size": 12485672,
+        "moved_at": "2025-10-02T11:16:09.058832"
+      },
+      {
+        "original_path": "temp/doc/26125534357-1-192.mp4",
+        "archive_path": "archive_for_cleanup/probably_remove/temp/doc/26125534357-1-192.mp4",
+        "reason": "临时目录中的大型视频文件 (31.7MB)",
+        "size": 33256265,
+        "moved_at": "2025-10-02T11:16:09.059754"
+      },
+      {
+        "original_path": "temp/doc/遮罩编辑器.md",
+        "archive_path": "archive_for_cleanup/probably_remove/temp/doc/遮罩编辑器.md",
+        "reason": "临时目录中的其他文件",
+        "size": 6999,
+        "moved_at": "2025-10-02T11:16:09.060200"
+      },
+      {
+        "original_path": "tests/debug_runninghub_fieldname_1972135780502159362.py",
+        "archive_path": "archive_for_cleanup/probably_remove/tests/debug_runninghub_fieldname_1972135780502159362.py",
+        "reason": "调试文件，可能是临时生成的",
+        "size": 5718,
+        "moved_at": "2025-10-02T11:16:09.060595"
+      },
+      {
+        "original_path": "app.log",
+        "archive_path": "archive_for_cleanup/probably_remove/app.log",
+        "reason": "日志文件 (51.9KB)",
+        "size": 53134,
+        "moved_at": "2025-10-02T11:16:09.061007"
+      },
+      {
+        "original_path": "scripts/deploy_test.log",
+        "archive_path": "archive_for_cleanup/probably_remove/scripts/deploy_test.log",
+        "reason": "日志文件 (1.3KB)",
+        "size": 1349,
+        "moved_at": "2025-10-02T11:16:09.061762"
+      },
+      {
+        "original_path": "archive/deprecated/task_create.html.backup",
+        "archive_path": "archive_for_cleanup/probably_remove/archive/deprecated/task_create.html.backup",
+        "reason": "备份文件 (包含 .backup)",
+        "size": 36724,
+        "moved_at": "2025-10-02T11:16:09.062185"
+      }
+    ],
+    "review_required": [
+      {
+        "original_path": "temp/doc/产品图.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/产品图.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 118,
+        "moved_at": "2025-10-02T11:16:09.062692"
+      },
+      {
+        "original_path": "temp/doc/WanVACE衣服替换_正式版_api.json",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/WanVACE衣服替换_正式版_api.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "size": 13627,
+        "moved_at": "2025-10-02T11:16:09.063124"
+      },
+      {
+        "original_path": "temp/doc/大妈-白色tshirt.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/大妈-白色tshirt.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 1053116,
+        "moved_at": "2025-10-02T11:16:09.063463"
+      },
+      {
+        "original_path": "temp/doc/产品1.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/产品1.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 830891,
+        "moved_at": "2025-10-02T11:16:09.063954"
+      },
+      {
+        "original_path": "temp/doc/橄榄绿.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/橄榄绿.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 2779468,
+        "moved_at": "2025-10-02T11:16:09.064437"
+      },
+      {
+        "original_path": "temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）_api.json",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）_api.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "size": 11915,
+        "moved_at": "2025-10-02T11:16:09.064932"
+      },
+      {
+        "original_path": "temp/doc/模特1.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/模特1.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 1297024,
+        "moved_at": "2025-10-02T11:16:09.065385"
+      },
+      {
+        "original_path": "temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）.json",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/正式版 _ InfiniteTalk视频+音频对口型OK（优化版）.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "size": 95370,
+        "moved_at": "2025-10-02T11:16:09.065909"
+      },
+      {
+        "original_path": "temp/doc/1962342403615166465-背景替换工作流.json",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/1962342403615166465-背景替换工作流.json",
+        "reason": "临时目录中的JSON文件，可能是工作流配置",
+        "size": 125383,
+        "moved_at": "2025-10-02T11:16:09.066523"
+      },
+      {
+        "original_path": "temp/doc/模特图.png",
+        "archive_path": "archive_for_cleanup/review_required/temp/doc/模特图.png",
+        "reason": "临时目录中的图片文件，可能是测试素材",
+        "size": 118,
+        "moved_at": "2025-10-02T11:16:09.066944"
+      }
+    ]
+  },
+  "summary": {
+    "definitely_remove_count": 8,
+    "probably_remove_count": 9,
+    "review_required_count": 10
+  }
+}

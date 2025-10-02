@@ -1,0 +1,17 @@
+# Keep image small and build fast
+.git
+.github
+.trae
+.claude
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+venv/
+.venv/
+env/
+.env/
+node_modules/
+temp/
+.DS_Store

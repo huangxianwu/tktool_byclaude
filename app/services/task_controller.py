@@ -8,6 +8,7 @@ from app.models.Task import Task
 from app.services.task_queue_service import TaskQueueService
 from app.services.task_status_service import TaskStatusService
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +372,146 @@ class TaskController:
         """获取任务历史日志"""
         return self.get_task_logs(task_id)
     
+    def diagnose_and_retry(self, task_id: str):
+        """
+        诊断任务失败原因（包括APIKEY_INVALID_NODE_INFO等），必要时自动修复字段并重试提交到RunningHub。
+        返回字典，包括诊断结论、是否修复、重试结果等。
+        """
+        from app import db
+        from app.models.Task import Task
+        from app.models.TaskLog import TaskLog
+        from app.models.TaskData import TaskData
+        from app.models.Node import Node
+        from app.services.error_handler import ErrorHandler, RetryHandler, ErrorCode
+
+        task = Task.query.get(task_id)
+        if not task:
+            return {'success': False, 'error': '任务不存在'}
+
+        # 记录诊断开始
+        start_log = TaskLog(task_id=task_id, message="🩺 开始诊断任务失败原因并尝试修复")
+        db.session.add(start_log)
+        db.session.commit()
+
+        # 提取最近的错误日志
+        logs = TaskLog.query.filter_by(task_id=task_id).order_by(TaskLog.timestamp.desc()).limit(50).all()
+        last_error_msg = None
+        for log in logs:
+            msg_upper = (log.message or '').upper()
+            if '❌' in log.message or 'ERROR' in msg_upper or 'FAILED' in msg_upper:
+                last_error_msg = log.message
+                break
+
+        diagnose = {}
+        error_code = None
+        if last_error_msg:
+            error_code, _ = ErrorHandler.parse_error_from_message(last_error_msg)
+            diagnose['last_error'] = last_error_msg
+            diagnose['error_code'] = error_code.value if error_code else None
+        else:
+            diagnose['last_error'] = None
+
+        # 当检测到节点信息错误时，尝试修复字段名
+        fixed_summary = None
+        if error_code == ErrorCode.RUNNINGHUB_INVALID_NODE_INFO or (last_error_msg and 'APIKEY_INVALID_NODE_INFO' in last_error_msg.upper()):
+            fixed_summary = self._fix_task_data_field_names(task)
+            fix_log = TaskLog(task_id=task_id, message=f"🛠️ 自动修复字段名: {json.dumps(fixed_summary, ensure_ascii=False)}")
+            db.session.add(fix_log)
+            db.session.commit()
+
+        # 决定是否进行重试
+        should_retry = True
+        if error_code and not RetryHandler.is_retryable(error_code):
+            # 节点信息错误在修复后仍允许重试
+            if error_code != ErrorCode.RUNNINGHUB_INVALID_NODE_INFO and not fixed_summary:
+                should_retry = False
+
+        retry_result = None
+        if should_retry:
+            queue_service = TaskQueueService()
+            try:
+                success, runninghub_task_id, error_msg = queue_service.submit_task_to_runninghub(task)
+                retry_result = {
+                    'success': success,
+                    'runninghub_task_id': runninghub_task_id,
+                    'error_msg': error_msg
+                }
+                # 写入日志
+                if success:
+                    db.session.add(TaskLog(task_id=task_id, message=f"🔁 重试提交成功 → 远程ID: {runninghub_task_id}"))
+                    # 更新任务状态由queue_service处理，这里补充一次保障
+                    task.status = 'QUEUED'
+                    task.runninghub_task_id = runninghub_task_id
+                    db.session.commit()
+                else:
+                    db.session.add(TaskLog(task_id=task_id, message=f"🔁 重试提交失败: {error_msg}"))
+                    db.session.commit()
+            except Exception as e:
+                retry_result = {'success': False, 'error': str(e)}
+                db.session.add(TaskLog(task_id=task_id, message=f"🔁 重试提交异常: {str(e)}"))
+                db.session.commit()
+        else:
+            db.session.add(TaskLog(task_id=task_id, message="⛔ 当前错误类型不可重试，已结束诊断"))
+            db.session.commit()
+
+        return {
+            'success': True,
+            'diagnose': diagnose,
+            'fixed': fixed_summary is not None,
+            'fixed_summary': fixed_summary,
+            'retry_result': retry_result
+        }
+
+    def _fix_task_data_field_names(self, task):
+        """
+        根据工作流中的节点类型，修正TaskData的field_name，使其符合RunningHub标准：
+        - image → field_name: 'image'
+        - video → field_name: 'file'，并确保存在 'video-preview'（为空）
+        - text  → field_name: 'text'
+        - number→ field_name: 'number'
+        - audio → field_name: 'audio'
+        返回修改摘要。
+        """
+        from app import db
+        from app.models.TaskData import TaskData
+        from app.models.Node import Node
+
+        # 构建节点类型映射
+        nodes = Node.query.filter_by(workflow_id=task.workflow_id).all()
+        node_type_map = {n.node_id: n.node_type for n in nodes}
+
+        standard_fields = {
+            'image': ['image'],
+            'video': ['file', 'video-preview'],
+            'text': ['text'],
+            'number': ['number'],
+            'audio': ['audio']
+        }
+
+        changes = []
+        # 修正现有字段名
+        for d in task.data:
+            node_type = node_type_map.get(d.node_id)
+            if not node_type:
+                continue
+            allowed = standard_fields.get(node_type, [])
+            if allowed and d.field_name not in allowed:
+                old = d.field_name
+                d.field_name = allowed[0]
+                changes.append({'node_id': d.node_id, 'from': old, 'to': d.field_name})
+        db.session.commit()
+
+        # 为video节点补充video-preview
+        for node_id, node_type in node_type_map.items():
+            if node_type == 'video':
+                has_preview = any((d.node_id == node_id and d.field_name == 'video-preview') for d in task.data)
+                if not has_preview:
+                    db.session.add(TaskData(task_id=task.task_id, node_id=node_id, field_name='video-preview', field_value=''))
+                    changes.append({'node_id': node_id, 'added': 'video-preview'})
+        db.session.commit()
+
+        return {'changes': changes, 'total_changes': len(changes)}
+
     def refresh_task_files(self, task_id):
         """刷新任务输出文件"""
         try:

@@ -60,3 +60,13 @@ def serve_output_file(filename):
         return send_from_directory(output_dir, filename)
     except Exception as e:
         return f"File not found: {str(e)}", 404
+
+# 新增：点集编辑器页面
+@bp.route('/point-editor')
+def point_editor():
+    return render_template('point_editor.html')
+
+# 新增：遮罩编辑器页面
+@bp.route('/mask-editor')
+def mask_editor():
+    return render_template('mask_editor.html')

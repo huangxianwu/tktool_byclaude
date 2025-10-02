@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block page_title %}遮罩编辑器{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- 页面头部 -->
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900">遮罩编辑器（V1 轻量版）</h2>
+      <p class="mt-2 text-gray-600">支持画/擦/保存/取消，导出与原图同尺寸的灰度 PNG</p>
+    </div>
+    <div class="mt-4 lg:mt-0 flex items-center space-x-3">
+      <label class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer">
+        <i class="fas fa-image mr-2"></i>
+        选择图片
+        <input id="file" type="file" accept="image/*" class="hidden" />
+      </label>
+      <label class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer">
+        <i class="fas fa-video mr-2"></i>
+        选择视频
+        <input id="fileVideo" type="file" accept="video/*" class="hidden" />
+      </label>
+      <button id="save" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 shadow-sm" disabled>
+        <i class="fas fa-save mr-2"></i>
+        保存
+      </button>
+      <button id="cancel" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm" disabled>
+        <i class="fas fa-times mr-2"></i>
+        取消
+      </button>
+    </div>
+  </div>
+
+  <!-- 工具栏 -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center">
+        <button id="paint" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm">
+          画
+        </button>
+        <button id="erase" class="ml-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-200 shadow-sm">
+          擦
+        </button>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-gray-700">半径</span>
+        <input id="radius" type="range" min="2" max="200" value="20" class="w-48" />
+        <span id="rval" class="text-gray-600">20px</span>
+      </div>
+      <div class="text-sm text-gray-500">提示：未选择图片前，保存/取消不可用</div>
+    </div>
+  </div>
+
+  <!-- 画布区 -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div class="stage relative max-w-full overflow-auto">
+      <canvas id="base" class="block w-full h-auto"></canvas>
+      <canvas id="mask" class="block" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto; z-index:10"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/mask_editor.js"></script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python run.py:*)",
+      "Bash(pip install:*)",
+      "Bash(/usr/local/opt/python@3.11/bin/python3.11 -m pip install:*)",
+      "Bash(/usr/local/opt/python@3.11/bin/python3.11:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(python:*)",
+      "Bash(lsof:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node test_edit_page_fix.js:*)",
+      "WebFetch(domain:www.runninghub.cn)",
+      "Bash(kill:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 10 curl -s \"http://localhost:5002/queue\")",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(git fetch:*)",
+      "Bash(git reset:*)",
+      "Bash(git clean:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

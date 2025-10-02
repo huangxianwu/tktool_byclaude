@@ -63,4 +63,17 @@ outputs/
 test_*.py
 
 # Claude Code specific
-.claude/
+.claude/# 归档目录
+archive/
+
+# 临时文件
+*.tmp
+*.temp
+
+# 输出目录
+outputs/
+downloads/
+
+# 数据库备份
+*.db.backup
+instance/*.backup
