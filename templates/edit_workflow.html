@@ -101,10 +101,11 @@ function showMessage(message, type = 'info') {
                                 required
                                 class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors duration-200">
                             <option value="text" {% if node.node_type == 'text' %}selected{% endif %}>文本</option>
-                            <option value="number" {% if node.node_type == 'number' %}selected{% endif %}>数字</option>
-                            <option value="image" {% if node.node_type == 'image' %}selected{% endif %}>图片</option>
-                            <option value="video" {% if node.node_type == 'video' %}selected{% endif %}>视频</option>
-                            <option value="audio" {% if node.node_type == 'audio' %}selected{% endif %}>音频</option>
+                                            <option value="number" {% if node.node_type == 'number' %}selected{% endif %}>数字</option>
+                                            <option value="image" {% if node.node_type == 'image' %}selected{% endif %}>图片</option>
+                                            <option value="video" {% if node.node_type == 'video' %}selected{% endif %}>视频</option>
+                                            <option value="file" {% if node.node_type == 'file' %}selected{% endif %}>文件</option>
+                                            <option value="audio" {% if node.node_type == 'audio' %}selected{% endif %}>音频</option>
                         </select>
                     </div>
                     <button type="button" 

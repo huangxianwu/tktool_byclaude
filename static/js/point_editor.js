@@ -95,8 +95,27 @@ class PointEditor {
     };
   }
 
-  fromJSON(data, { normalized = false } = {}) {
+  fromJSON(data, { normalized = false, useCoordinateFix = false } = {}) {
     if (!data) return;
+    
+    let processedData = data;
+    
+    // 如果启用坐标修复，尝试修复ComfyUI坐标
+    if (useCoordinateFix && window.CoordinateFix) {
+      try {
+        const coordinateFix = new window.CoordinateFix(this);
+        processedData = coordinateFix.fixComfyUICoordinates(data);
+        console.log('坐标修复结果:', {
+          original: data,
+          fixed: processedData,
+          imageSize: { width: this.imageWidth, height: this.imageHeight }
+        });
+      } catch (error) {
+        console.warn('坐标修复失败，使用原始数据:', error);
+        processedData = data;
+      }
+    }
+    
     const w = this.imageWidth || 1;
     const h = this.imageHeight || 1;
     const parse = (arr, type) => (arr || []).map((p, idx) => ({
@@ -105,8 +124,8 @@ class PointEditor {
       y: normalized ? (p.y * h) : p.y,
       type
     }));
-    const pos = parse(data.positive, 'positive');
-    const neg = parse(data.negative, 'negative');
+    const pos = parse(processedData.positive, 'positive');
+    const neg = parse(processedData.negative, 'negative');
     this.points = [...pos, ...neg];
     this.nextId = (this.points.reduce((m, p) => Math.max(m, p.id), 0) || 0) + 1;
     this.pushHistory();
@@ -435,9 +454,29 @@ class PointEditor {
 (function init() {
   const canvas = document.getElementById('point-canvas');
   if (!canvas) return;
+  
+  // 检测是否为嵌入模式
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEmbedded = urlParams.get('embedded') === 'true';
+  const nodeId = urlParams.get('nodeId');
+  
+  // 如果是嵌入模式，显示保存按钮并隐藏部分功能
+  if (isEmbedded) {
+    const saveBtn = document.getElementById('tool-save');
+    if (saveBtn) {
+      saveBtn.classList.remove('hidden');
+    }
+    
+    // 可以选择隐藏一些不必要的按钮
+    const exportBtn = document.getElementById('tool-export');
+    const importBtn = document.getElementById('tool-import');
+    if (exportBtn) exportBtn.style.display = 'none';
+    if (importBtn) importBtn.style.display = 'none';
+  }
+  
   const editor = new PointEditor(canvas, {
     onChange: (data) => {
-      const normalized = document.getElementById('normalize-toggle').checked;
+      const normalized = document.getElementById('normalize-toggle') && document.getElementById('normalize-toggle').checked;
       const out = editor.toJSON({ normalized });
       const ta = document.getElementById('json-output');
       if (ta) ta.value = JSON.stringify(out);
@@ -459,6 +498,101 @@ class PointEditor {
         showToast('仅支持 JPG/PNG 图片', 'error');
       }
       imgFileInput.value = '';
+    });
+  }
+
+  // 选择视频并截取首帧作为底图
+  const videoFileInput = document.getElementById('fileVideo');
+  const btnLoadVideo = document.getElementById('tool-load-video');
+  if (btnLoadVideo && videoFileInput) {
+    btnLoadVideo.onclick = () => videoFileInput.click();
+    videoFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      try {
+        // 使用增强的视频首帧提取功能
+        if (window.VideoFrameFix) {
+          // 启用调试模式以便观察修正过程
+          window.VideoFrameFix.setDebugMode(true);
+          
+          // 获取用户设置的目标分辨率
+          let targetResolution = null;
+          const enableResolutionFix = document.getElementById('enable-resolution-fix');
+          const targetWidth = document.getElementById('target-width');
+          const targetHeight = document.getElementById('target-height');
+          
+          if (enableResolutionFix && enableResolutionFix.checked && 
+              targetWidth && targetHeight && 
+              targetWidth.value && targetHeight.value) {
+            targetResolution = {
+              width: parseInt(targetWidth.value),
+              height: parseInt(targetHeight.value)
+            };
+            console.log('VideoFrameFix: 使用目标分辨率', targetResolution);
+          }
+          
+          await window.VideoFrameFix.loadVideoFrameWithCorrectDimensions(editor, file, targetResolution);
+          showToast('已截取首帧作为底图（已修正坐标）', 'success');
+        } else {
+          // 回退到原始方法
+          const extractFirstFrame = (file) => new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const video = document.createElement('video');
+            let cleaned = false;
+            const cleanup = () => { if (cleaned) return; cleaned = true; try { URL.revokeObjectURL(url); } catch {} video.src = ''; };
+            video.preload = 'auto';
+            video.src = url;
+            video.muted = true;
+            video.playsInline = true;
+
+            const onError = (e) => { cleanup(); reject(e?.error || e || new Error('视频解码错误')); };
+            const draw = () => {
+              try {
+                const vw = video.videoWidth, vh = video.videoHeight;
+                if (!vw || !vh) return false;
+                const off = document.createElement('canvas');
+                off.width = vw; off.height = vh;
+                const ctx = off.getContext('2d');
+                ctx.drawImage(video, 0, 0, vw, vh);
+                const dataUrl = off.toDataURL('image/png');
+                cleanup();
+                resolve(dataUrl);
+                return true;
+              } catch (err) {
+                cleanup();
+                reject(err);
+                return false;
+              }
+            };
+
+            video.addEventListener('error', onError, { once: true });
+            video.addEventListener('loadedmetadata', () => {
+              const attempt = () => {
+                if (video.readyState >= 2) {
+                  if (!draw()) {
+                    setTimeout(attempt, 100);
+                  }
+                } else {
+                  const onceDraw = () => { draw() || setTimeout(attempt, 100); };
+                  video.addEventListener('loadeddata', onceDraw, { once: true });
+                  video.addEventListener('canplay', onceDraw, { once: true });
+                }
+              };
+              try { video.currentTime = 0; } catch {}
+              attempt();
+            }, { once: true });
+          });
+
+          const dataUrl = await extractFirstFrame(file);
+          await editor.loadImage(dataUrl);
+          showToast('已截取首帧作为底图', 'success');
+        }
+      } catch (err) {
+        console.error('提取视频首帧失败:', err);
+        showToast('视频加载失败，请重试', 'error');
+      }
+      e.target.value = '';
     });
   }
 
@@ -523,6 +657,92 @@ class PointEditor {
     };
   }
 
+  // 保存按钮（嵌入模式）
+  const btnSave = document.getElementById('tool-save');
+  if (btnSave && isEmbedded) {
+    btnSave.onclick = async () => {
+      try {
+        // 获取当前坐标数据
+        const normalized = document.getElementById('normalize-toggle') && document.getElementById('normalize-toggle').checked;
+        const coordinates = editor.toJSON({ normalized });
+        
+        // 生成标注图片
+        let annotatedImage = null;
+        if (editor.image && editor.image.src) {
+          annotatedImage = await generateAnnotatedImage(editor);
+        }
+        
+        // 准备要传递的数据
+        const saveData = {
+          coordinates: coordinates,
+          annotatedImage: annotatedImage,
+          nodeId: nodeId,
+          timestamp: new Date().toISOString()
+        };
+        
+        // 向父窗口发送消息
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'pointEditorSave',
+            data: saveData
+          }, window.location.origin);
+        }
+        
+        showToast('数据已保存', 'success');
+      } catch (error) {
+        console.error('保存失败:', error);
+        showToast('保存失败', 'error');
+      }
+    };
+  }
+
+  // 生成标注图片的函数
+  async function generateAnnotatedImage(editor) {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // 设置画布尺寸为图片原始尺寸
+      canvas.width = editor.imageWidth;
+      canvas.height = editor.imageHeight;
+      
+      // 绘制原始图片
+      ctx.drawImage(editor.image, 0, 0, editor.imageWidth, editor.imageHeight);
+      
+      // 绘制坐标点
+      const points = editor.points;
+      points.forEach(point => {
+        ctx.save();
+        
+        // 设置点的样式
+        const isPositive = point.type === 'positive';
+        ctx.fillStyle = isPositive ? '#22c55e' : '#ef4444';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        
+        // 绘制圆点
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 绘制标签
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(isPositive ? '+' : '-', point.x, point.y + 4);
+        
+        ctx.restore();
+      });
+      
+      // 返回base64图片数据
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error('生成标注图片失败:', error);
+      return null;
+    }
+  }
+
   // 导入点数据
   const fileInput = document.getElementById('file-import');
   document.getElementById('tool-import').onclick = () => fileInput.click();
@@ -545,6 +765,236 @@ class PointEditor {
     return arr.every(p => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
   }
 
+  function detectCoordinateType(data, imageWidth, imageHeight) {
+    const arr = [...(data.positive||[]), ...(data.negative||[])];
+    if (arr.length === 0) return 'pixel';
+    
+    // 检查是否所有坐标都在0-1范围内
+    const allInUnit = arr.every(p => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
+    if (allInUnit) return 'normalized';
+    
+    // 检查是否坐标值合理（不超过图片尺寸太多）
+    const maxX = Math.max(...arr.map(p => p.x));
+    const maxY = Math.max(...arr.map(p => p.y));
+    
+    if (imageWidth && imageHeight) {
+      // 如果坐标值接近图片尺寸，认为是像素坐标
+      if (maxX <= imageWidth * 1.2 && maxY <= imageHeight * 1.2) {
+        return 'pixel';
+      }
+    }
+    
+    // 默认返回像素坐标
+    return 'pixel';
+  }
+
+  // 粘贴坐标功能
+  const pasteModal = document.getElementById('paste-coords-modal');
+  const coordsInput = document.getElementById('coords-input');
+  const btnPasteCoords = document.getElementById('tool-paste-coords');
+  const btnCancelPaste = document.getElementById('cancel-paste');
+  const btnConfirmPaste = document.getElementById('confirm-paste');
+
+  if (btnPasteCoords && pasteModal) {
+    // 显示模态框
+    btnPasteCoords.onclick = () => {
+      pasteModal.classList.remove('hidden');
+      coordsInput.focus();
+      coordsInput.select();
+    };
+
+    // 取消按钮
+    btnCancelPaste.onclick = () => {
+      pasteModal.classList.add('hidden');
+      coordsInput.value = '';
+    };
+
+    // 点击背景关闭模态框
+    pasteModal.onclick = (e) => {
+      if (e.target === pasteModal) {
+        pasteModal.classList.add('hidden');
+        coordsInput.value = '';
+      }
+    };
+
+    // 确认导入
+    btnConfirmPaste.onclick = () => {
+      const text = coordsInput.value.trim();
+      if (!text) {
+        showToast('请输入坐标数据', 'error');
+        return;
+      }
+
+      try {
+        const data = JSON.parse(text);
+        
+        // 验证数据格式
+        if (!data || typeof data !== 'object') {
+          throw new Error('数据格式错误');
+        }
+        
+        if (!data.positive && !data.negative) {
+          throw new Error('未找到positive或negative坐标数据');
+        }
+
+        // 验证坐标数组格式
+        const validateCoords = (coords, type) => {
+          if (!Array.isArray(coords)) return;
+          coords.forEach((coord, idx) => {
+            if (typeof coord.x !== 'number' || typeof coord.y !== 'number') {
+              throw new Error(`${type}坐标第${idx + 1}项格式错误：需要x和y数值`);
+            }
+          });
+        };
+
+        if (data.positive) validateCoords(data.positive, 'positive');
+        if (data.negative) validateCoords(data.negative, 'negative');
+
+        // 获取用户选择的坐标类型
+        const coordTypeRadio = document.querySelector('input[name="coord-type"]:checked');
+        const userChoice = coordTypeRadio ? coordTypeRadio.value : 'auto';
+        
+        let normalized = false;
+        let coordType = 'pixel';
+        
+        if (userChoice === 'auto') {
+          // 自动检测坐标类型
+          coordType = detectCoordinateType(data, editor.imageWidth, editor.imageHeight);
+          normalized = (coordType === 'normalized');
+        } else if (userChoice === 'normalized') {
+          normalized = true;
+          coordType = 'normalized';
+        } else {
+          normalized = false;
+          coordType = 'pixel';
+        }
+        
+        // 检查是否启用坐标修复
+        const enableFix = document.getElementById('enable-coordinate-fix')?.checked;
+        
+        // 记录导入信息到调试面板
+        console.log('坐标导入信息:', {
+          userChoice,
+          detectedType: coordType,
+          normalized,
+          enableFix,
+          imageSize: { width: editor.imageWidth, height: editor.imageHeight },
+          pointCount: (data.positive?.length || 0) + (data.negative?.length || 0)
+        });
+        
+        // 导入数据（启用或禁用坐标修复）
+        editor.fromJSON(data, { normalized, useCoordinateFix: enableFix });
+        
+        // 更新调试面板
+        updateDebugPanel();
+        
+        // 关闭模态框并清空输入
+        pasteModal.classList.add('hidden');
+        coordsInput.value = '';
+        
+        const totalPoints = (data.positive?.length || 0) + (data.negative?.length || 0);
+        const typeText = userChoice === 'auto' ? `自动检测为${coordType}坐标` : `${coordType}坐标`;
+        showToast(`成功导入 ${totalPoints} 个坐标点（${typeText}）`, 'success');
+        
+      } catch (error) {
+        console.error('导入坐标失败:', error);
+        showToast(`导入失败：${error.message}`, 'error');
+      }
+    };
+
+    // 支持Ctrl+Enter快捷键确认
+    coordsInput.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        btnConfirmPaste.click();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        btnCancelPaste.click();
+      }
+    });
+  }
+
+  // 调试面板功能
+  const debugPanel = document.getElementById('debug-panel');
+  const debugToggle = document.getElementById('toggle-debug');
+  const toolDebug = document.getElementById('tool-debug');
+
+  function updateDebugPanel() {
+    if (!debugPanel || debugPanel.classList.contains('hidden')) return;
+    
+    // 更新图片信息
+    const imageSizeEl = document.getElementById('debug-image-size');
+    const imageScaleEl = document.getElementById('debug-image-scale');
+    
+    if (imageSizeEl) {
+      if (editor.imageWidth && editor.imageHeight) {
+        imageSizeEl.textContent = `${editor.imageWidth} × ${editor.imageHeight}`;
+      } else {
+        imageSizeEl.textContent = '未加载';
+      }
+    }
+    
+    if (imageScaleEl) {
+      imageScaleEl.textContent = editor.scale.toFixed(2);
+    }
+    
+    // 更新坐标列表
+    const coordsListEl = document.getElementById('debug-coords-list');
+    if (coordsListEl) {
+      if (editor.points.length === 0) {
+        coordsListEl.innerHTML = '<div class="text-gray-400">暂无坐标点</div>';
+      } else {
+        const coordsHtml = editor.points.map(point => {
+          const screenCoord = editor.imageToScreen(point.x, point.y);
+          const typeColor = point.type === 'positive' ? 'text-green-600' : 'text-red-600';
+          return `
+            <div class="mb-1 p-1 bg-gray-50 rounded text-xs">
+              <div class="${typeColor} font-medium">ID${point.id} (${point.type})</div>
+              <div>原始: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})</div>
+              <div>屏幕: (${screenCoord.x.toFixed(1)}, ${screenCoord.y.toFixed(1)})</div>
+            </div>
+          `;
+        }).join('');
+        coordsListEl.innerHTML = coordsHtml;
+      }
+    }
+  }
+
+  // 调试面板切换
+  if (toolDebug && debugPanel) {
+    toolDebug.onclick = () => {
+      debugPanel.classList.toggle('hidden');
+      updateDebugPanel();
+    };
+  }
+
+  if (debugToggle && debugPanel) {
+    debugToggle.onclick = () => {
+      debugPanel.classList.add('hidden');
+    };
+  }
+
+  // 监听编辑器变化，更新调试面板
+  if (editor.onChange) {
+    const originalOnChange = editor.onChange;
+    editor.onChange = (data) => {
+      originalOnChange(data);
+      updateDebugPanel();
+    };
+  } else {
+    editor.onChange = updateDebugPanel;
+  }
+
+  // 监听图片加载，更新调试面板
+  const originalLoadImage = editor.loadImage;
+  editor.loadImage = async function(src) {
+    const result = await originalLoadImage.call(this, src);
+    updateDebugPanel();
+    return result;
+  };
+
   // Expose for debugging
   window.__pointEditor = editor;
+  window.__updateDebugPanel = updateDebugPanel;
 })();

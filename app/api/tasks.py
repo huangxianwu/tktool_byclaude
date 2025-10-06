@@ -128,6 +128,8 @@ def create_task():
                                 filename = f"upload_{task_id}_{node_data['node_id']}.png"
                             elif node.node_type == 'video':
                                 filename = f"upload_{task_id}_{node_data['node_id']}.mp4"
+                            elif node.node_type == 'file':
+                                filename = f"upload_{task_id}_{node_data['node_id']}.mp4"
                             elif node.node_type == 'audio':
                                 filename = f"upload_{task_id}_{node_data['node_id']}.mp3"
                             else:

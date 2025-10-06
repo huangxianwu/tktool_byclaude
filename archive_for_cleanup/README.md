@@ -4,6 +4,13 @@
 
 ## 目录结构
 
+archive_for_cleanup/
+├── definitely_remove/     # 确定可删除的文件
+├── probably_remove/       # 建议删除的文件  
+├── review_required/       # 需要人工审核的文件
+├── README.md             # 归档说明文档
+└── move_record.json      # 详细的移动记录
+
 ### definitely_remove/
 **确定可以删除的文件**
 - 系统生成文件（.DS_Store, .sync-meta.json等）

@@ -38,45 +38,56 @@ def get_workflows():
 @bp.route('', methods=['POST'])
 def create_workflow():
     """创建工作流模板"""
-    data = request.get_json()
-    
-    if not data or 'name' not in data:
-        return jsonify({'error': 'Missing workflow name'}), 400
-    
-    # 使用用户提供的ID或生成唯一ID
-    workflow_id = data.get('workflow_id', str(uuid.uuid4()))
-    
-    # 检查ID是否已存在
-    existing_workflow = Workflow.query.get(workflow_id)
-    if existing_workflow:
-        return jsonify({'error': 'Workflow ID already exists'}), 400
-    
-    workflow = Workflow(
-        workflow_id=workflow_id, 
-        name=data['name'],
-        description=data.get('description', '')  # 支持描述字段
-    )
-    db.session.add(workflow)
-    
-    # 添加节点
-    if 'nodes' in data:
-        for node_data in data['nodes']:
-            # 处理节点ID：如果为空或未提供，则自动生成
-            node_id = node_data.get('node_id')
-            if not node_id or not node_id.strip():
-                node_id = str(uuid.uuid4())
-            
-            node = Node(
-                workflow_id=workflow_id,
-                node_id=node_id,
-                node_name=node_data['node_name'],
-                node_type=node_data['node_type']
-            )
-            db.session.add(node)
-    
-    db.session.commit()
-    
-    return jsonify(workflow.to_dict()), 201
+    try:
+        data = request.get_json()
+        print(f"DEBUG: Received data: {data}")
+        
+        if not data or 'name' not in data:
+            print("DEBUG: Missing workflow name")
+            return jsonify({'error': 'Missing workflow name'}), 400
+        
+        # 使用用户提供的ID或生成唯一ID
+        workflow_id = data.get('workflow_id', str(uuid.uuid4()))
+        
+        # 检查ID是否已存在
+        existing_workflow = Workflow.query.get(workflow_id)
+        if existing_workflow:
+            print(f"DEBUG: Workflow ID already exists: {workflow_id}")
+            return jsonify({'error': 'Workflow ID already exists'}), 400
+        
+        workflow = Workflow(
+            workflow_id=workflow_id, 
+            name=data['name'],
+            description=data.get('description', '')  # 支持描述字段
+        )
+        db.session.add(workflow)
+        
+        # 添加节点
+        if 'nodes' in data:
+            for node_data in data['nodes']:
+                print(f"DEBUG: Processing node: {node_data}")
+                # 处理节点ID：如果为空或未提供，则自动生成
+                node_id = node_data.get('node_id')
+                if not node_id or not node_id.strip():
+                    node_id = str(uuid.uuid4())
+                
+                node = Node(
+                    workflow_id=workflow_id,
+                    node_id=node_id,
+                    node_name=node_data['node_name'],
+                    node_type=node_data['node_type']
+                )
+                db.session.add(node)
+        
+        db.session.commit()
+        print("DEBUG: Workflow created successfully")
+        
+        return jsonify(workflow.to_dict()), 201
+        
+    except Exception as e:
+        print(f"DEBUG: Error creating workflow: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @bp.route('/<workflow_id>', methods=['GET'])
 def get_workflow(workflow_id):

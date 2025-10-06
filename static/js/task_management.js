@@ -23,7 +23,19 @@ class TaskManager {
             endDate: ''
         };
         
+        // 从URL参数中读取筛选条件
+        this.initFromUrlParams();
+        
         this.init();
+    }
+    
+    // 从URL参数初始化筛选条件
+    initFromUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const workflowId = urlParams.get('workflow_id');
+        if (workflowId) {
+            this.filters.workflow = workflowId;
+        }
     }
     
     async init() {
@@ -32,6 +44,7 @@ class TaskManager {
         this.loadTasks();
         this.loadQueueStatus();
         this.bindEvents();
+        this.updateFilterHint();
     }
     
     bindEvents() {
@@ -56,6 +69,7 @@ class TaskManager {
         // 工作流筛选
         document.getElementById('workflow-filter').addEventListener('change', (e) => {
             this.filters.workflow = e.target.value;
+            this.updateFilterHint();
             this.loadTasks();
         });
         
@@ -183,13 +197,13 @@ class TaskManager {
         // 添加工作流选项
         this.workflows.forEach(workflow => {
             const option = document.createElement('option');
-            option.value = workflow.id;
-            option.textContent = workflow.name || `工作流 ${workflow.id}`;
+            option.value = workflow.workflow_id;
+            option.textContent = workflow.name || `工作流 ${workflow.workflow_id}`;
             workflowSelect.appendChild(option);
         });
         
         // 恢复筛选状态
-        if (currentFilterValue && this.workflows.some(w => String(w.id) === String(currentFilterValue))) {
+        if (currentFilterValue && this.workflows.some(w => String(w.workflow_id) === String(currentFilterValue))) {
             // 工作流存在于列表中，恢复选中状态
             workflowSelect.value = currentFilterValue;
             this.filters.workflow = currentFilterValue;
@@ -1179,6 +1193,49 @@ class TaskManager {
             return '时间解析失败';
         }
     }
+    
+    // 更新筛选提示
+    updateFilterHint() {
+        const filterHint = document.getElementById('workflow-filter-hint');
+        
+        if (this.filters.workflow && this.filters.workflow !== '') {
+            // 显示筛选提示
+            const workflow = this.workflows.find(w => String(w.workflow_id) === String(this.filters.workflow));
+            const workflowName = workflow ? workflow.name : `工作流 ${this.filters.workflow}`;
+            
+            if (filterHint) {
+                // 更新筛选提示文本，保持HTML结构
+                const textSpan = filterHint.querySelector('span');
+                if (textSpan) {
+                    textSpan.innerHTML = `<i class="fas fa-filter text-blue-500 mr-2"></i>当前筛选: ${workflowName}`;
+                }
+                filterHint.style.display = 'block';
+                
+                // 显示清除按钮
+                const clearFilterBtn = document.getElementById('clear-workflow-filter');
+                if (clearFilterBtn) {
+                    clearFilterBtn.style.display = 'inline-block';
+                }
+            }
+        } else {
+            // 隐藏筛选提示
+            if (filterHint) {
+                filterHint.style.display = 'none';
+            }
+            
+            const clearFilterBtn = document.getElementById('clear-workflow-filter');
+            if (clearFilterBtn) {
+                clearFilterBtn.style.display = 'none';
+            }
+        }
+    }
+    
+    // 清除工作流筛选
+    clearWorkflowFilter() {
+        const url = new URL(window.location);
+        url.searchParams.delete('workflow_id');
+        window.location.href = url.toString();
+    }
 }
 
 // 全局变量和函数（供HTML调用）
@@ -1238,6 +1295,12 @@ function copyToClipboard(text) {
         console.error('复制失败:', err);
         taskManager.showError('复制失败');
     });
+}
+
+function clearWorkflowFilter() {
+    if (taskManager) {
+        taskManager.clearWorkflowFilter();
+    }
 }
 
 // 点击模态框外部关闭

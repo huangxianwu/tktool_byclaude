@@ -7,7 +7,7 @@ class Node(db.Model):
     workflow_id = db.Column(db.String(50), db.ForeignKey('workflows.workflow_id'), nullable=False)
     node_id = db.Column(db.String(50), nullable=False)
     node_name = db.Column(db.String(100), nullable=False)
-    node_type = db.Column(db.String(20), nullable=False)  # image, video, text, number, audio
+    node_type = db.Column(db.String(50), nullable=False)  # 'image', 'video', 'file', 'text', 'number', 'audio'
     
     def to_dict(self):
         return {

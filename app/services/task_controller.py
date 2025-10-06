@@ -483,6 +483,7 @@ class TaskController:
         standard_fields = {
             'image': ['image'],
             'video': ['file', 'video-preview'],
+            'file': ['file'],
             'text': ['text'],
             'number': ['number'],
             'audio': ['audio']

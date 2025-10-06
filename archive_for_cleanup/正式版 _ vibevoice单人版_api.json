@@ -1,0 +1,60 @@
+{
+  "14": {
+    "inputs": {
+      "model_name": "VibeVoice-1.5B",
+      "text": "Speaker 2: \"you grilling tonight?\"\nSpeaker 1: \"yeah, but I had to get my propane gas gauge first to see how much I had in it. connect it to the tank itself. turn it on see it's almost full good deal. now we'll hook that up to the grill.we're going to be in business. so get yourself a propane gas tank gauge. just click on below in TikTok shop it's a lifesaver.\"\n",
+      "quantize_llm_4bit": false,
+      "attention_mode": "sdpa",
+      "cfg_scale": 1.3,
+      "inference_steps": 10,
+      "seed": 187376275284164,
+      "do_sample": true,
+      "temperature": 0.95,
+      "top_p": 0.95,
+      "top_k": 0,
+      "force_offload": true,
+      "speaker_1_voice": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "VibeVoiceTTS",
+    "_meta": {
+      "title": "VibeVoice TTS"
+    }
+  },
+  "15": {
+    "inputs": {
+      "audio": "4123894c25d23bf62ededeb4709c976078a16c539701564258e524a8452eca83.MP3",
+      "audioUI": ""
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "19": {
+    "inputs": {
+      "audio": "22af2a73da2e6a103e0af2d30d51ae61f95346360ed861260f1d01c05a196f67.MP3",
+      "audioUI": ""
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "21": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "audioUI": "",
+      "audio": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "Save Audio (FLAC)"
+    }
+  }
+}
