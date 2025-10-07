@@ -64,7 +64,15 @@ def serve_output_file(filename):
 # 新增：点集编辑器页面
 @bp.route('/point-editor')
 def point_editor():
-    return render_template('point_editor.html')
+    from flask import request
+    # 检查是否为嵌入模式
+    embedded = request.args.get('embedded', 'false').lower() == 'true'
+    if embedded:
+        # 嵌入模式使用专门的模板，不包含左侧菜单栏
+        return render_template('point_editor_embedded.html')
+    else:
+        # 正常模式使用标准模板
+        return render_template('point_editor.html')
 
 # 新增：遮罩编辑器页面
 @bp.route('/mask-editor')
