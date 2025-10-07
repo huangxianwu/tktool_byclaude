@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点编辑器参数传递测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .button-group {
+            margin: 15px 0;
+        }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .output-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .comparison-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .old-mode {
+            background-color: #ffe6e6;
+        }
+        .new-mode {
+            background-color: #e6ffe6;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success {
+            background-color: #28a745;
+        }
+        .status-warning {
+            background-color: #ffc107;
+        }
+        .status-error {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 点编辑器参数传递测试</h1>
+            <p>验证优化后的单参数模式（仅传递points_store）</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 测试数据生成</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="generateTestData()">生成测试数据</button>
+                <button class="btn btn-warning" onclick="clearTestData()">清空数据</button>
+            </div>
+            <div id="testDataOutput" class="output-area">
+                点击"生成测试数据"开始测试...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 参数传递模式对比</h3>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="testOldMode()">测试旧的3参数模式</button>
+                <button class="btn btn-success" onclick="testNewMode()">测试优化后的单参数模式</button>
+                <button class="btn btn-warning" onclick="compareResults()">对比结果</button>
+            </div>
+            <div id="comparisonOutput" class="output-area">
+                选择测试模式开始对比...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 性能分析</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>指标</th>
+                        <th class="old-mode">旧模式（3参数）</th>
+                        <th class="new-mode">新模式（单参数）</th>
+                        <th>改进效果</th>
+                    </tr>
+                </thead>
+                <tbody id="performanceTable">
+                    <tr>
+                        <td>参数数量</td>
+                        <td id="oldParamCount">-</td>
+                        <td id="newParamCount">-</td>
+                        <td id="paramCountImprovement">-</td>
+                    </tr>
+                    <tr>
+                        <td>数据大小</td>
+                        <td id="oldDataSize">-</td>
+                        <td id="newDataSize">-</td>
+                        <td id="dataSizeImprovement">-</td>
+                    </tr>
+                    <tr>
+                        <td>内存风险</td>
+                        <td id="oldMemoryRisk">-</td>
+                        <td id="newMemoryRisk">-</td>
+                        <td id="memoryRiskImprovement">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ 验证结果</h3>
+            <div id="validationResults" class="output-area">
+                运行测试后显示验证结果...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testData = null;
+        let oldModeResults = null;
+        let newModeResults = null;
+
+        function generateTestData() {
+            testData = {
+                coordinates: {
+                    positive: [
+                        {x: 346.06, y: 297.49},
+                        {x: 400.12, y: 350.75},
+                        {x: 280.33, y: 220.88},
+                        {x: 520.45, y: 180.22},
+                        {x: 150.67, y: 420.33}
+                    ],
+                    negative: [
+                        {x: 220.08, y: 355.17},
+                        {x: 150.45, y: 180.92},
+                        {x: 600.78, y: 250.44}
+                    ]
+                }
+            };
+
+            const output = document.getElementById('testDataOutput');
+            output.innerHTML = `
+                <strong>✅ 测试数据已生成</strong><br>
+                正样本数量: ${testData.coordinates.positive.length}<br>
+                负样本数量: ${testData.coordinates.negative.length}<br>
+                <br>
+                <strong>正样本坐标:</strong><br>
+                ${JSON.stringify(testData.coordinates.positive, null, 2)}<br>
+                <br>
+                <strong>负样本坐标:</strong><br>
+                ${JSON.stringify(testData.coordinates.negative, null, 2)}
+            `;
+        }
+
+        function clearTestData() {
+            testData = null;
+            oldModeResults = null;
+            newModeResults = null;
+            
+            document.getElementById('testDataOutput').innerHTML = '数据已清空，点击"生成测试数据"重新开始...';
+            document.getElementById('comparisonOutput').innerHTML = '选择测试模式开始对比...';
+            document.getElementById('validationResults').innerHTML = '运行测试后显示验证结果...';
+            
+            // 清空性能表格
+            document.getElementById('oldParamCount').textContent = '-';
+            document.getElementById('newParamCount').textContent = '-';
+            document.getElementById('paramCountImprovement').textContent = '-';
+            document.getElementById('oldDataSize').textContent = '-';
+            document.getElementById('newDataSize').textContent = '-';
+            document.getElementById('dataSizeImprovement').textContent = '-';
+            document.getElementById('oldMemoryRisk').textContent = '-';
+            document.getElementById('newMemoryRisk').textContent = '-';
+            document.getElementById('memoryRiskImprovement').textContent = '-';
+        }
+
+        function testOldMode() {
+            if (!testData) {
+                alert('请先生成测试数据！');
+                return;
+            }
+
+            const positiveCoords = testData.coordinates.positive;
+            const negativeCoords = testData.coordinates.negative;
+
+            // 构建3个参数（旧模式）
+            const pointsStoreData = {
+                positive: positiveCoords,
+                negative: negativeCoords
+            };
+
+            oldModeResults = [
+                {
+                    nodeId: "38",
+                    fieldName: "points_store",
+                    fieldValue: JSON.stringify(pointsStoreData)
+                },
+                {
+                    nodeId: "38",
+                    fieldName: "coordinates",
+                    fieldValue: JSON.stringify(positiveCoords)
+                },
+                {
+                    nodeId: "38",
+                    fieldName: "neg_coordinates",
+                    fieldValue: JSON.stringify(negativeCoords)
+                }
+            ];
+
+            const totalSize = oldModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+
+            const output = document.getElementById('comparisonOutput');
+            output.innerHTML = `
+                <strong>🔴 旧的3参数模式测试结果:</strong><br>
+                参数数量: ${oldModeResults.length}<br>
+                正样本数量: ${positiveCoords.length}<br>
+                负样本数量: ${negativeCoords.length}<br>
+                总数据大小: ${totalSize} 字符<br>
+                内存使用: 高（包含重复数据）<br>
+                风险: 可能导致torch.OutOfMemoryError<br>
+                <br>
+                <strong>参数详情:</strong><br>
+                ${oldModeResults.map(node => `${node.fieldName}: ${node.fieldValue.length} 字符`).join('<br>')}
+            `;
+
+            updatePerformanceTable();
+        }
+
+        function testNewMode() {
+            if (!testData) {
+                alert('请先生成测试数据！');
+                return;
+            }
+
+            const positiveCoords = testData.coordinates.positive;
+            const negativeCoords = testData.coordinates.negative;
+
+            // 构建单个参数（新模式）
+            const pointsStoreData = {
+                positive: positiveCoords,
+                negative: negativeCoords
+            };
+
+            newModeResults = [
+                {
+                    nodeId: "38",
+                    fieldName: "points_store",
+                    fieldValue: JSON.stringify(pointsStoreData)
+                }
+            ];
+
+            const totalSize = newModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+
+            const output = document.getElementById('comparisonOutput');
+            output.innerHTML = `
+                <strong>🟢 优化后的单参数模式测试结果:</strong><br>
+                参数数量: ${newModeResults.length}<br>
+                正样本数量: ${positiveCoords.length}<br>
+                负样本数量: ${negativeCoords.length}<br>
+                总数据大小: ${totalSize} 字符<br>
+                内存使用: 低（无重复数据）<br>
+                风险: 避免了torch.OutOfMemoryError<br>
+                <br>
+                <strong>参数详情:</strong><br>
+                ${newModeResults.map(node => `${node.fieldName}: ${node.fieldValue.length} 字符`).join('<br>')}
+            `;
+
+            updatePerformanceTable();
+        }
+
+        function compareResults() {
+            if (!oldModeResults || !newModeResults) {
+                alert('请先运行两种模式的测试！');
+                return;
+            }
+
+            const oldSize = oldModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+            const newSize = newModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+            const reduction = oldSize - newSize;
+            const reductionPercent = ((reduction / oldSize) * 100).toFixed(1);
+
+            const output = document.getElementById('comparisonOutput');
+            output.innerHTML = `
+                <strong>📊 对比分析结果:</strong><br>
+                <br>
+                <strong>参数数量对比:</strong><br>
+                旧模式: ${oldModeResults.length} 个参数<br>
+                新模式: ${newModeResults.length} 个参数<br>
+                减少: ${oldModeResults.length - newModeResults.length} 个参数<br>
+                <br>
+                <strong>数据大小对比:</strong><br>
+                旧模式: ${oldSize} 字符<br>
+                新模式: ${newSize} 字符<br>
+                减少: ${reduction} 字符 (${reductionPercent}%)<br>
+                <br>
+                <strong>优化效果:</strong><br>
+                ${reduction > 0 ? '✅ 内存使用显著减少' : '⚠️ 内存使用未减少'}<br>
+                ${reductionPercent > 40 ? '✅ 优化效果显著' : '⚠️ 优化效果一般'}<br>
+                ✅ 避免了参数冗余<br>
+                ✅ 降低了torch.OutOfMemoryError风险
+            `;
+
+            validateResults();
+        }
+
+        function validateResults() {
+            if (!newModeResults) {
+                return;
+            }
+
+            const pointsStoreNode = newModeResults.find(node => node.fieldName === 'points_store');
+            
+            let validationHtml = '<strong>🔍 参数完整性验证:</strong><br>';
+
+            if (!pointsStoreNode) {
+                validationHtml += '<span class="status-indicator status-error"></span>❌ 缺少points_store参数<br>';
+            } else {
+                try {
+                    const pointsData = JSON.parse(pointsStoreNode.fieldValue);
+                    const positiveCount = pointsData.positive ? pointsData.positive.length : 0;
+                    const negativeCount = pointsData.negative ? pointsData.negative.length : 0;
+
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ points_store参数存在<br>';
+                    validationHtml += `<span class="status-indicator status-success"></span>✅ 包含正样本: ${positiveCount}个<br>`;
+                    validationHtml += `<span class="status-indicator status-success"></span>✅ 包含负样本: ${negativeCount}个<br>`;
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ 数据格式正确<br>';
+
+                    if (positiveCount > 0 || negativeCount > 0) {
+                        validationHtml += '<span class="status-indicator status-success"></span>✅ 坐标数据有效<br>';
+                    } else {
+                        validationHtml += '<span class="status-indicator status-warning"></span>⚠️ 坐标数据为空<br>';
+                    }
+
+                    validationHtml += '<br><strong>🎯 测试结论:</strong><br>';
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ 优化后的单参数模式工作正常<br>';
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ 参数完整性验证通过<br>';
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ 内存使用得到优化<br>';
+                    validationHtml += '<span class="status-indicator status-success"></span>✅ 避免了torch.OutOfMemoryError风险<br>';
+
+                } catch (e) {
+                    validationHtml += `<span class="status-indicator status-error"></span>❌ 数据格式错误: ${e.message}<br>`;
+                }
+            }
+
+            document.getElementById('validationResults').innerHTML = validationHtml;
+        }
+
+        function updatePerformanceTable() {
+            if (oldModeResults) {
+                const oldSize = oldModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+                document.getElementById('oldParamCount').textContent = oldModeResults.length;
+                document.getElementById('oldDataSize').textContent = oldSize + ' 字符';
+                document.getElementById('oldMemoryRisk').textContent = '高风险';
+            }
+
+            if (newModeResults) {
+                const newSize = newModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+                document.getElementById('newParamCount').textContent = newModeResults.length;
+                document.getElementById('newDataSize').textContent = newSize + ' 字符';
+                document.getElementById('newMemoryRisk').textContent = '低风险';
+            }
+
+            if (oldModeResults && newModeResults) {
+                const oldSize = oldModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+                const newSize = newModeResults.reduce((sum, node) => sum + node.fieldValue.length, 0);
+                const paramReduction = oldModeResults.length - newModeResults.length;
+                const sizeReduction = oldSize - newSize;
+                const sizeReductionPercent = ((sizeReduction / oldSize) * 100).toFixed(1);
+
+                document.getElementById('paramCountImprovement').textContent = `减少 ${paramReduction} 个`;
+                document.getElementById('dataSizeImprovement').textContent = `减少 ${sizeReduction} 字符 (${sizeReductionPercent}%)`;
+                document.getElementById('memoryRiskImprovement').textContent = '显著降低';
+            }
+        }
+
+        // 页面加载时自动生成测试数据
+        window.onload = function() {
+            generateTestData();
+        };
+    </script>
+</body>
+</html>

@@ -106,6 +106,7 @@ function showMessage(message, type = 'info') {
                                             <option value="video" {% if node.node_type == 'video' %}selected{% endif %}>视频</option>
                                             <option value="file" {% if node.node_type == 'file' %}selected{% endif %}>文件</option>
                                             <option value="audio" {% if node.node_type == 'audio' %}selected{% endif %}>音频</option>
+                                            <option value="point_editor" {% if node.node_type == 'point_editor' %}selected{% endif %}>点编辑器</option>
                         </select>
                     </div>
                     <button type="button" 
@@ -158,6 +159,7 @@ function addNode() {
                                         <option value="image">图片</option>
                                         <option value="video">视频</option>
                                         <option value="audio">音频</option>
+                                        <option value="point_editor">点编辑器</option>
                                     </select>
             </div>
             <button type="button" 
