@@ -22,6 +22,8 @@ def get_workflows():
     if status_filter and status_filter in ['active', 'inactive']:
         query = query.filter_by(status=status_filter)
     
+    # 排序：置顶优先，且按置顶时间倒序，其次创建时间倒序
+    query = query.order_by(Workflow.pinned.desc(), Workflow.pinned_at.desc(), Workflow.created_at.desc())
     workflows = query.all()
     
     # 为每个工作流添加关联任务数量统计
@@ -34,6 +36,21 @@ def get_workflows():
         result.append(wf_dict)
     
     return jsonify(result)
+
+@bp.route('/<workflow_id>/pin', methods=['PATCH'])
+def pin_workflow(workflow_id):
+    """置顶或取消置顶工作流模板"""
+    from datetime import datetime
+    workflow = Workflow.query.get_or_404(workflow_id)
+    data = request.get_json(silent=True) or {}
+    pin = data.get('pin', True)
+    workflow.pinned = bool(pin)
+    workflow.pinned_at = datetime.utcnow() if workflow.pinned else None
+    db.session.commit()
+    return jsonify({
+        'message': 'Workflow pinned' if workflow.pinned else 'Workflow unpinned',
+        'workflow': workflow.to_dict()
+    })
 
 @bp.route('', methods=['POST'])
 def create_workflow():

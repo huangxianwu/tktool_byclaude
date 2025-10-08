@@ -9,6 +9,8 @@ class Workflow(db.Model):
     description = db.Column(db.Text, nullable=True)  # 工作流描述
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='active', nullable=False)  # active, inactive
+    pinned = db.Column(db.Boolean, default=False, nullable=False)  # 置顶标记
+    pinned_at = db.Column(db.DateTime, nullable=True)  # 置顶时间
     
     nodes = db.relationship('Node', backref='workflow', lazy=True, cascade='all, delete-orphan')
     
@@ -19,5 +21,7 @@ class Workflow(db.Model):
             'description': self.description or '',  # 如果为None则返回空字符串
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'status': self.status,
+            'pinned': self.pinned,
+            'pinned_at': self.pinned_at.isoformat() if self.pinned_at else None,
             'nodes': [node.to_dict() for node in self.nodes]
         }

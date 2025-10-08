@@ -83,29 +83,51 @@
 .image-preview, .video-preview {
     width: 100%;
     margin: 0;
+    padding: 0;
+    height: auto;
 }
 
-/* 预览容器内部div - 简化布局，自适应内容高度 */
+/* 预览容器内部div - 简化布局，自适应内容高度，移除固定高度 */
 .image-preview > div,
 .video-preview > div {
-    display: flex;
-    flex-direction: column;
     width: 100%;
+    margin: 0;
+    padding: 0;
+    height: auto;
+    /* 移除任何可能的固定高度或最小高度 */
 }
 
-/* 内部容器 - 移除所有padding和margin，自适应高度 */
+/* 视频预览的中间层容器 - 移除所有可能导致额外高度的样式 */
+.video-preview .relative {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* 内部容器 - 完全自适应内容，移除所有固定尺寸 */
 .image-preview .bg-gray-100,
 .video-preview .bg-gray-900,
 .video-preview .video-container {
     padding: 0;
     margin: 0;
+    width: 100%;
+    height: auto; /* 确保高度自适应 */
+    min-height: 0; /* 移除默认最小高度 */
+    border-radius: 8px;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
 }
 
-/* 确保图片和视频充分利用容器空间，自适应高度 */
+/* 确保图片和视频充分利用容器空间，完全自适应 */
 .image-preview img,
 .video-preview video {
     object-fit: contain;
@@ -115,6 +137,7 @@
     max-height: 70vh;
     border-radius: 8px;
     display: block;
+    /* 移除任何可能导致空白的样式 */
 }
 
 /* 悬停效果优化 */
@@ -130,11 +153,25 @@
     right: 8px;
 }
 
-/* 响应式优化 */
+/* 响应式优化 - 移动设备上进一步减少空白 */
 @media (max-width: 640px) {
     .image-preview img,
     .video-preview video {
         max-height: 60vh;
+    }
+    
+    /* 移动设备上确保容器完全贴合内容 */
+    .image-preview > div,
+    .video-preview > div {
+        margin: 0;
+        padding: 0;
+    }
+    
+    .image-preview .bg-gray-100,
+    .video-preview .bg-gray-900,
+    .video-preview .video-container {
+        margin: 0;
+        padding: 0;
     }
 }
 
@@ -404,7 +441,37 @@ function addFilePreviewListeners() {
                         
                         // 设置最小高度250px，最大高度500px
                         const finalHeight = Math.max(250, Math.min(500, calculatedHeight));
+                        
+                        // 设置视频元素高度
                         this.style.height = finalHeight + 'px';
+                        
+                        // 调整视频直接容器(.bg-gray-900)
+                        const videoContainer = this.closest('.bg-gray-900') || this.closest('.video-container');
+                        if (videoContainer) {
+                            videoContainer.style.height = finalHeight + 'px';
+                            videoContainer.style.display = 'flex';
+                            videoContainer.style.alignItems = 'center';
+                            videoContainer.style.justifyContent = 'center';
+                            videoContainer.style.padding = '0';
+                            videoContainer.style.margin = '0';
+                        }
+                        
+                        // 调整中间层容器(.relative.bg-white...)
+                        const middleContainer = container.querySelector('.relative');
+                        if (middleContainer) {
+                            middleContainer.style.height = finalHeight + 'px';
+                            middleContainer.style.padding = '0';
+                            middleContainer.style.margin = '0';
+                            middleContainer.style.display = 'flex';
+                            middleContainer.style.alignItems = 'center';
+                            middleContainer.style.justifyContent = 'center';
+                            middleContainer.style.overflow = 'hidden';
+                        }
+                        
+                        // 调整最外层预览容器
+                        container.style.height = finalHeight + 'px';
+                        container.style.margin = '0';
+                        container.style.padding = '0';
                         
                         // 自动播放预览（静音）
                         this.muted = true;

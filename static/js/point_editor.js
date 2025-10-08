@@ -627,21 +627,32 @@ class PointEditor {
   document.getElementById('tool-move').onclick = () => { editor.mode = 'pan'; };
   document.getElementById('tool-zoomfit').onclick = () => editor.fitToView();
   document.getElementById('tool-clear').onclick = () => { editor.clearDataOnly(); editor.draw(); editor.emitChange(); };
-  document.getElementById('tool-undo').onclick = () => editor.undo();
-  document.getElementById('tool-redo').onclick = () => editor.redo();
+  // 撤销重做按钮
+  const undoBtn = document.getElementById('tool-undo');
+  if (undoBtn) undoBtn.onclick = () => editor.undo();
+  
+  const redoBtn = document.getElementById('tool-redo');
+  if (redoBtn) redoBtn.onclick = () => editor.redo();
 
-  document.getElementById('normalize-toggle').addEventListener('change', () => editor.emitChange());
+  // 归一化切换
+  const normalizeToggle = document.getElementById('normalize-toggle');
+  if (normalizeToggle) {
+    normalizeToggle.addEventListener('change', () => editor.emitChange());
+  }
 
-  // 导出
-  document.getElementById('tool-export').onclick = () => {
-    const normalized = document.getElementById('normalize-toggle').checked;
-    const json = JSON.stringify(editor.toJSON({ normalized }), null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'points.json'; a.click();
-    URL.revokeObjectURL(url);
-  };
+  // 导出按钮（仅在非嵌入模式下存在）
+  const exportBtn = document.getElementById('tool-export');
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      const normalized = normalizeToggle ? normalizeToggle.checked : false;
+      const json = JSON.stringify(editor.toJSON({ normalized }), null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'points.json'; a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
 
   // 复制到剪贴板
   const btnCopy = document.getElementById('btn-copy');
@@ -659,17 +670,29 @@ class PointEditor {
 
   // 保存按钮（嵌入模式）
   const btnSave = document.getElementById('tool-save');
-  if (btnSave && isEmbedded) {
+  if (btnSave) {
+    // 确保在嵌入模式下显示保存按钮
+    if (isEmbedded) {
+      btnSave.classList.remove('hidden');
+      btnSave.style.display = 'inline-flex';
+    }
+    
     btnSave.onclick = async () => {
       try {
+        console.log('保存按钮被点击，嵌入模式:', isEmbedded, 'nodeId:', nodeId);
+        
         // 获取当前坐标数据
-        const normalized = document.getElementById('normalize-toggle') && document.getElementById('normalize-toggle').checked;
+        const normalizeToggle = document.getElementById('normalize-toggle');
+        const normalized = normalizeToggle ? normalizeToggle.checked : false;
         const coordinates = editor.toJSON({ normalized });
+        
+        console.log('获取到的坐标数据:', coordinates);
         
         // 生成标注图片
         let annotatedImage = null;
         if (editor.image && editor.image.src) {
           annotatedImage = await generateAnnotatedImage(editor);
+          console.log('生成标注图片成功');
         }
         
         // 准备要传递的数据
@@ -680,20 +703,27 @@ class PointEditor {
           timestamp: new Date().toISOString()
         };
         
+        console.log('准备发送的数据:', saveData);
+        
         // 向父窗口发送消息
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({
             type: 'pointEditorSave',
             data: saveData
           }, window.location.origin);
+          console.log('消息已发送到父窗口');
+        } else {
+          console.log('未检测到父窗口，可能不在嵌入模式中');
         }
         
         showToast('数据已保存', 'success');
       } catch (error) {
         console.error('保存失败:', error);
-        showToast('保存失败', 'error');
+        showToast('保存失败: ' + error.message, 'error');
       }
     };
+  } else {
+    console.log('未找到保存按钮元素');
   }
 
   // 生成标注图片的函数
@@ -743,22 +773,25 @@ class PointEditor {
     }
   }
 
-  // 导入点数据
+  // 导入点数据（仅在非嵌入模式下存在）
   const fileInput = document.getElementById('file-import');
-  document.getElementById('tool-import').onclick = () => fileInput.click();
-  fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const text = await file.text();
-    try {
-      const data = JSON.parse(text);
-      const normalized = !!data.normalized || allInUnitRange(data);
-      editor.fromJSON(data, { normalized });
-      showToast('导入成功', 'success');
-    } catch {
-      showToast('导入失败：JSON格式错误', 'error');
-    }
-    fileInput.value = '';
-  });
+  const importBtn = document.getElementById('tool-import');
+  if (fileInput && importBtn) {
+    importBtn.onclick = () => fileInput.click();
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const text = await file.text();
+      try {
+        const data = JSON.parse(text);
+        const normalized = !!data.normalized || allInUnitRange(data);
+        editor.fromJSON(data, { normalized });
+        showToast('导入成功', 'success');
+      } catch {
+        showToast('导入失败：JSON格式错误', 'error');
+      }
+      fileInput.value = '';
+    });
+  }
 
   function allInUnitRange(data) {
     const arr = [...(data.positive||[]), ...(data.negative||[])];

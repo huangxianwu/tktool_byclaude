@@ -363,6 +363,7 @@ async function loadWorkflows() {
                     <td>
                         <div class="workflow-name">
                             <strong>${wf.name}</strong>
+                            ${wf.pinned ? '<i class="fas fa-thumbtack text-red-500 ml-1" title="置顶"></i>' : ''}
                         </div>
                     </td>
                     <td>
@@ -424,6 +425,10 @@ async function loadWorkflows() {
                                     <a href="#" onclick="exportWorkflow('${workflowId}')">
                                         <i class="fas fa-download"></i>
                                         导出
+                                    </a>
+                                    <a href="#" onclick="pinWorkflow('${workflowId}', ${!wf.pinned})">
+                                        <i class="fas fa-thumbtack"></i>
+                                        ${wf.pinned ? '取消置顶' : '置顶到顶部'}
                                     </a>
                                     <div class="dropdown-divider"></div>
                                     <a href="#" onclick="deleteWorkflow('${workflowId}')" class="text-danger">
@@ -1176,3 +1181,23 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endblock %}
+// 置顶/取消置顶工作流
+async function pinWorkflow(workflowId, pin) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}/pin`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin })
+        });
+        if (response.ok) {
+            const result = await response.json();
+            alert(result.message);
+            loadWorkflows();
+        } else {
+            alert('置顶操作失败');
+        }
+    } catch (error) {
+        console.error('置顶操作失败:', error);
+        alert('置顶操作失败');
+    }
+}

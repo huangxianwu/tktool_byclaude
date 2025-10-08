@@ -921,10 +921,9 @@ function addLogEntry(log) {
     
     logEntry.appendChild(timestamp);
     logEntry.appendChild(message);
-    logsContainer.appendChild(logEntry);
     
-    // 自动滚动到底部
-    logsContainer.scrollTop = logsContainer.scrollHeight;
+    // 追加日志项，但不改变用户当前滚动位置
+    logsContainer.appendChild(logEntry);
 }
 
 // 执行任务
@@ -936,7 +935,7 @@ async function runTask() {
         runBtn.textContent = '执行中...';
         runBtn.disabled = true;
         
-        const response = await fetch(`/api/tasks/${taskId}/run`, {
+        const response = await fetch(`/api/tasks/${taskId}/start`, {
             method: 'POST'
         });
         

@@ -182,6 +182,30 @@ class TaskQueueService:
             db.session.add(api_log)
             db.session.commit()
             
+            # 记录完整的API调用参数
+            import json
+            api_params = {
+                "workflow_id": task.workflow_id,
+                "is_plus": is_plus,
+                "nodeInfoList": []
+            }
+            
+            for data in task.data:
+                node_info = {
+                    "nodeId": data.node_id,
+                    "fieldName": data.field_name,
+                    "fieldValue": data.field_value
+                }
+                api_params["nodeInfoList"].append(node_info)
+            
+            # 记录完整参数到日志
+            params_log = TaskLog(
+                task_id=task.task_id,
+                message=f"📤 API调用完整参数: {json.dumps(api_params, ensure_ascii=False, indent=2)}"
+            )
+            db.session.add(params_log)
+            db.session.commit()
+            
             result = self.runninghub_service.create_task(task.workflow_id, task_data, is_plus)
             
             if result and 'taskId' in result:
