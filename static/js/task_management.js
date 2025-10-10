@@ -1182,7 +1182,7 @@ class TaskManager {
             if (isNaN(date.getTime())) {
                 return '时间格式错误';
             }
-            return date.toLocaleTimeString('zh-CN', {
+            return date.toLocaleTimeString([], {
                 hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
