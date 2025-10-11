@@ -77,3 +77,6 @@ downloads/
 # 数据库备份
 *.db.backup
 instance/*.backup
+
+# 视频文件
+ uploads/auto_editor/
