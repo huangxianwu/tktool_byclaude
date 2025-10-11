@@ -78,3 +78,23 @@ def point_editor():
 @bp.route('/mask-editor')
 def mask_editor():
     return render_template('mask_editor.html')
+
+# 新增：自动剪辑师页面
+@bp.route('/auto-editor')
+def auto_editor():
+    """AI剪辑师页面"""
+    return render_template('auto_editor.html')
+
+@bp.route('/video-strategy')
+def video_strategy():
+    """视频创意策划页面"""
+    return render_template('video_strategy.html')
+
+# 新增：提供上传文件的静态访问（仅用于MVP预览/参考，不做鉴权）
+@bp.route('/uploads/auto_editor/<path:filename>')
+def serve_uploaded_auto_editor_file(filename):
+    try:
+        base_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads', 'auto_editor')
+        return send_from_directory(base_dir, filename)
+    except Exception as e:
+        return f"File not found: {str(e)}", 404

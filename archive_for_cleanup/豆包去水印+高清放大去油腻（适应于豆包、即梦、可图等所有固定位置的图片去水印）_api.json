@@ -1,0 +1,199 @@
+{
+  "3": {
+    "inputs": {
+      "seed": 795827934333662,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "31",
+        0
+      ],
+      "positive": [
+        "38",
+        0
+      ],
+      "negative": [
+        "38",
+        1
+      ],
+      "latent_image": [
+        "38",
+        2
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "17": {
+    "inputs": {
+      "image": "clipspace/bfb38141e9ed611522001c22675bd3e6_47e7a9da846285092d4a182b07616833bf76df9b12456c71b58180e57c9532c9.png [input]"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "23": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "guidance": 30,
+      "conditioning": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
+  },
+  "31": {
+    "inputs": {
+      "unet_name": "F.1-Fill-fp16_Inpaint_Outpaint_1.0.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "32": {
+    "inputs": {
+      "vae_name": "ae.sft"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "34": {
+    "inputs": {
+      "clip_name1": "sd3/t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "38": {
+    "inputs": {
+      "noise_mask": true,
+      "positive": [
+        "26",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "vae": [
+        "32",
+        0
+      ],
+      "pixels": [
+        "17",
+        0
+      ],
+      "mask": [
+        "17",
+        1
+      ]
+    },
+    "class_type": "InpaintModelConditioning",
+    "_meta": {
+      "title": "InpaintModelConditioning"
+    }
+  },
+  "47": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/view?filename=rgthree.compare._temp_eqscy_00001_sjqrm_1760075508.jpg&type=temp&subfolder=&rand=0.8950928311829947&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiZmIzODE0MWU5ZWQ2MTE1MjIwMDFjMjI2NzViZDNlNiIsInNpZ25FeHBpcmUiOjE3NjA2Nzc2NDE2OTUsInRzIjoxNzYwMDcyODQxNjk1LCJzaWduIjoiZDExMjEwNDlmYTJkNzg2NjQyYzE4YWEyZjA1MWE1OGQifQ==&Rh-Identify=bfb38141e9ed611522001c22675bd3e6"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/view?filename=rgthree.compare._temp_eqscy_00002_aypui_1760075509.jpg&type=temp&subfolder=&rand=0.6258708194984809&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiZmIzODE0MWU5ZWQ2MTE1MjIwMDFjMjI2NzViZDNlNiIsInNpZ25FeHBpcmUiOjE3NjA2Nzc2NDE2OTUsInRzIjoxNzYwMDcyODQxNjk1LCJzaWduIjoiZDExMjEwNDlmYTJkNzg2NjQyYzE4YWEyZjA1MWE1OGQifQ==&Rh-Identify=bfb38141e9ed611522001c22675bd3e6"
+          }
+        ]
+      },
+      "image_a": [
+        "17",
+        0
+      ],
+      "image_b": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}

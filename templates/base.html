@@ -100,6 +100,16 @@
                           x-show="sidebarOpen" 
                           x-transition>遮罩编辑器</span>
                 </a>
+                <!-- 新增：自动剪辑师入口 -->
+                <a href="/auto-editor" 
+                   class="nav-link flex items-center px-3 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors duration-200 group" 
+                   data-page="auto-editor">
+                    <i class="fas fa-wand-magic-sparkles w-5 h-5 text-gray-500 group-hover:text-primary transition-colors duration-200"></i>
+                    <span class="ml-3 font-medium transition-opacity duration-300" 
+                          :class="!sidebarOpen && 'opacity-0 w-0 overflow-hidden'" 
+                          x-show="sidebarOpen" 
+                          x-transition>自动剪辑师</span>
+                </a>
                 
             </nav>
             
@@ -306,6 +316,8 @@
         handleResize(); // 初始化调用
     </script>
     
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Alpine.js -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- 自定义脚本 -->

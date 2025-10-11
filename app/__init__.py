@@ -39,6 +39,13 @@ def create_app(config_class=Config):
     
     from app.api.task_logs import bp as task_logs_bp
     app.register_blueprint(task_logs_bp)
+
+    # 注册AI编辑器API
+    try:
+        from app.api.ai_editor import bp as ai_editor_bp
+        app.register_blueprint(ai_editor_bp)
+    except Exception as e:
+        app.logger.error(f"Failed to register AI Editor API: {e}")
     
     # 配置静态文件服务 - 为outputs目录提供静态文件访问
     from flask import send_from_directory

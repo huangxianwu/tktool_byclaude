@@ -1,0 +1,27 @@
+{
+  "phase1_analysis_and_strategy": {
+    "sellingPoints": [
+      "高效",
+      "便捷",
+      "专业"
+    ]
+  },
+  "phase2_creation_and_delivery": {
+    "videoProductionBlueprint": {
+      "sequences": [
+        {
+          "content": "开场介绍",
+          "duration": "5"
+        },
+        {
+          "content": "产品展示",
+          "duration": "10"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "title": "测试视频策略",
+    "created_at": "2025-01-10"
+  }
+}

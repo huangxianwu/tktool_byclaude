@@ -1,0 +1,26 @@
+{
+  "phase1_analysis_and_strategy": {
+    "targetAudience": {
+      "primaryAudience": "测试用户群体",
+      "demographics": "测试人群特征"
+    }
+  },
+  "phase2_creation_and_delivery": {
+    "videoProductionBlueprint": {
+      "scenes": [
+        {
+          "sequenceNumber": 1,
+          "sceneDescription": "测试场景"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "projectName": "集成测试项目",
+    "createdAt": "2025-10-10T14:14:31.3NZ",
+    "tags": [
+      "测试",
+      "集成"
+    ]
+  }
+}

@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block title %}视频创意策划 - 结构化数据展示{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/video_strategy.css">
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="video-strategy-container" x-data="videoStrategyApp()">
+  <div class="main-content">
+    <!-- 顶部导航 -->
+    <div class="top-nav">
+      <div class="nav-title">
+        <i class="fas fa-video"></i>
+        视频创意策划
+      </div>
+      <div class="nav-actions">
+        <button @click="saveData()" class="nav-btn" :disabled="loading">
+          <i class="fas fa-save"></i> 保存
+        </button>
+        <button @click="exportData()" class="nav-btn">
+          <i class="fas fa-download"></i> 导出
+        </button>
+        <button @click="copyToClipboard()" class="nav-btn">
+          <i class="fas fa-copy"></i> 复制
+        </button>
+        <button @click="generateTitle()" class="nav-btn">
+          <i class="fas fa-magic"></i> 生成标题
+        </button>
+      </div>
+    </div>
+
+    <!-- 阶段切换标签 -->
+    <div class="phase-tabs">
+      <div class="phase-tab" x-show="data?.phase1_analysis_and_strategy" x-cloak :class="{ active: currentPhase === 'phase1' }" @click="currentPhase = 'phase1'">
+        <i class="fas fa-search mr-2"></i>
+        第一阶段：分析与策略
+      </div>
+      <div class="phase-tab" :class="{ active: currentPhase === 'phase2' }" @click="currentPhase = 'phase2'">
+        <i class="fas fa-cogs mr-2"></i>
+        第二阶段：创作与交付
+      </div>
+    </div>
+
+    <!-- 主要内容区域 -->
+    <div class="content-wrapper">
+      <!-- 主面板 -->
+      <div class="main-panel">
+        <!-- 加载状态 -->
+        <div x-show="loading" class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>正在加载数据...</p>
+        </div>
+
+        <!-- 消息提示 -->
+        <div x-show="message.text" class="message" :class="message.type">
+          <i class="fas" :class="{
+            'fa-check-circle': message.type === 'success',
+            'fa-exclamation-circle': message.type === 'warning',
+            'fa-times-circle': message.type === 'error'
+          }"></i>
+          <span x-text="message.text"></span>
+        </div>
+
+        <!-- 第一阶段：分析与策略 -->
+        <div x-show="currentPhase === 'phase1' && data" x-transition>
+          <!-- 核心卖点 -->
+          <div class="strategy-card">
+            <div class="card-header">
+              <i class="fas fa-bullseye"></i>
+              核心卖点清单
+            </div>
+            <div class="card-content">
+              <div class="selling-points">
+                <template x-for="point in data?.phase1_analysis_and_strategy?.keySellingPoints || []">
+                  <div class="selling-point">
+                    <div class="selling-point-icon">
+                      <i class="fas fa-star"></i>
+                    </div>
+                    <span x-text="point"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- 素材分析 -->
+          <div class="strategy-card">
+            <div class="card-header">
+              <i class="fas fa-film"></i>
+              可用素材亮点分析
+            </div>
+            <div class="card-content">
+              <div class="clip-analysis">
+                <template x-for="clip in data?.phase1_analysis_and_strategy?.clipAnalysis || []">
+                  <div class="clip-item">
+                    <div class="clip-header">
+                      <div class="clip-name" x-text="clip.clipIdentifier"></div>
+                      <div class="clip-badge" :class="clip.isLongClip ? 'long' : 'short'">
+                        <span x-text="clip.isLongClip ? '长素材' : '短素材'"></span>
+                      </div>
+                    </div>
+                    <div class="field-content" x-text="clip.analysis"></div>
+                    <div x-show="clip.microClips && clip.microClips.length > 0" class="micro-clips">
+                      <template x-for="microClip in clip.microClips">
+                        <div class="micro-clip">
+                          <strong x-text="microClip.timestamp"></strong>: 
+                          <span x-text="microClip.description"></span>
+                          <br><small x-text="'最佳用途: ' + microClip.bestUse"></small>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- 语速基准 -->
+          <div class="strategy-card">
+            <div class="card-header">
+              <i class="fas fa-tachometer-alt"></i>
+              口播语速基准
+            </div>
+            <div class="card-content">
+              <div class="field-content">
+                <strong x-text="data?.phase1_analysis_and_strategy?.voiceoverPaceBenchmark?.wpm || 182"></strong>
+                <span x-text="data?.phase1_analysis_and_strategy?.voiceoverPaceBenchmark?.unit || 'Words Per Minute'"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二阶段：创作与交付 -->
+        <div x-show="currentPhase === 'phase2' && data" x-transition>
+          <!-- 视频制作蓝图 -->
+          <div class="strategy-card">
+            <div class="card-header">
+              <i class="fas fa-blueprint"></i>
+              视频制作蓝图
+            </div>
+            <div class="card-content">
+              <div class="blueprint-sequence">
+                <template x-for="sequence in data?.phase2_creation_and_delivery?.videoProductionBlueprint || []">
+                  <div class="sequence-item">
+                    <div class="sequence-header">
+                      <div class="sequence-number" x-text="sequence.sequence"></div>
+                      <div>
+                        <div class="font-semibold">场景 <span x-text="sequence.sequence"></span></div>
+                        <div class="text-sm opacity-90" x-text="sequence.clipSource"></div>
+                      </div>
+                    </div>
+                    <div class="sequence-body">
+                      <div class="sequence-field">
+                        <div class="field-label">
+                          <i class="fas fa-eye"></i>
+                          画面描述
+                        </div>
+                        <div class="field-content" x-text="sequence.clipDescription"></div>
+                      </div>
+                      <div class="sequence-field">
+                        <div class="field-label">
+                          <i class="fas fa-microphone"></i>
+                          英语口播文案
+                        </div>
+                        <div class="field-content" x-text="sequence.englishVoiceoverScript"></div>
+                      </div>
+                      <div class="sequence-field">
+                        <div class="field-label">
+                          <i class="fas fa-directions"></i>
+                          导演备注
+                        </div>
+                        <div class="field-content" x-text="sequence.directorsNotes"></div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- 完整语音脚本 -->
+          <div class="strategy-card">
+            <div class="card-header">
+              <i class="fas fa-scroll"></i>
+              完整英语语音脚本
+            </div>
+            <div class="card-content">
+              <div class="voiceover-script" x-text="data?.phase2_creation_and_delivery?.cleanEnglishVoiceoverScript || ''"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 无数据状态 -->
+        <div x-show="!data && !loading" class="loading-state">
+          <i class="fas fa-exclamation-triangle text-4xl text-gray-400 mb-4"></i>
+          <p class="text-lg text-gray-600">未找到数据</p>
+          <p class="text-sm text-gray-500">请检查URL参数或重新生成数据</p>
+        </div>
+      </div>
+
+      <!-- 侧边栏 -->
+      <div class="sidebar">
+        <!-- 统计信息 -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <i class="fas fa-chart-bar"></i>
+            统计信息
+          </div>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value" x-text="stats.totalSequences"></div>
+              <div class="stat-label">总场景数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" x-text="stats.totalWords"></div>
+              <div class="stat-label">总词数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" x-text="stats.estimatedDuration + 's'"></div>
+              <div class="stat-label">预估时长</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" x-text="stats.sellingPoints"></div>
+              <div class="stat-label">卖点数量</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <i class="fas fa-tools"></i>
+            操作
+          </div>
+          <div class="action-buttons">
+            <button @click="saveData()" class="action-btn primary" :disabled="loading">
+              <i class="fas fa-save"></i>
+              保存数据
+            </button>
+            <button @click="exportData()" class="action-btn secondary">
+              <i class="fas fa-download"></i>
+              导出JSON
+            </button>
+            <button @click="copyToClipboard()" class="action-btn secondary">
+              <i class="fas fa-copy"></i>
+              复制脚本
+            </button>
+          </div>
+        </div>
+
+        <!-- 搜索功能 -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <i class="fas fa-search"></i>
+            搜索
+          </div>
+          <input type="text" 
+                 x-model="searchQuery" 
+                 @input="performSearch()"
+                 placeholder="搜索内容..."
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <div x-show="searchResults.length > 0" class="mt-2">
+            <div class="text-sm text-gray-600 mb-1">搜索结果:</div>
+            <template x-for="result in searchResults">
+              <div class="text-xs bg-blue-50 p-2 rounded mb-1 cursor-pointer" 
+                   @click="highlightResult(result)"
+                   x-text="result.text.substring(0, 50) + '...'"></div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/video_strategy.js"></script>
+{% endblock %}

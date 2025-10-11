@@ -1,0 +1,36 @@
+{
+  "phase2_creation_and_delivery": {
+    "videoProductionBlueprint": [
+      {
+        "sequenceNumber": "001",
+        "videoName": "开场介绍",
+        "videoContent": "产品介绍和品牌展示",
+        "startTime": "00:00",
+        "endTime": "00:15",
+        "sceneDescription": "明亮的办公室环境，产品特写镜头",
+        "voiceover": "欢迎来到我们的产品世界，今天为您介绍...",
+        "directorNotes": "注意光线要充足，产品要突出"
+      },
+      {
+        "sequenceNumber": "002",
+        "videoName": "功能演示",
+        "videoContent": "核心功能操作演示",
+        "startTime": "15",
+        "endTime": "45",
+        "sceneDescription": "屏幕录制，手势操作清晰可见",
+        "voiceover": "接下来我们来看看这个功能是如何工作的...",
+        "directorNotes": "操作要慢一些，确保观众能跟上"
+      },
+      {
+        "sequenceNumber": "003",
+        "videoName": "用户反馈",
+        "videoContent": "真实用户使用体验分享",
+        "startTime": "0:45",
+        "endTime": "1:30",
+        "sceneDescription": "用户访谈，自然光线下的对话场景",
+        "voiceover": "听听我们用户是怎么说的...",
+        "directorNotes": "保持自然，不要过度表演"
+      }
+    ]
+  }
+}

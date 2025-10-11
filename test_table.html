@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表格渲染测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; }
+        button { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #tableContainer { margin-top: 20px; border: 1px solid #ddd; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .error { color: red; margin: 10px 0; }
+        .success { color: green; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>表格渲染测试</h1>
+        
+        <h2>JSON数据输入</h2>
+        <textarea id="jsonInput" placeholder="在此粘贴JSON数据..."></textarea>
+        <br>
+        <button onclick="loadTestData()">加载测试数据</button>
+        <button onclick="loadPhase2OnlyData()">加载Phase2专用数据</button>
+        <button onclick="renderTestTable()">渲染表格</button>
+        
+        <div id="message"></div>
+        
+        <h2>渲染结果</h2>
+        <div id="tableContainer"></div>
+    </div>
+
+    <script>
+        // 从AI回复记录文件加载测试数据
+        function loadTestData() {
+            fetch('/docs/AI回复记录.txt')
+                .then(response => response.text())
+                .then(text => {
+                    document.getElementById('jsonInput').value = text;
+                    showMessage('完整测试数据已加载', 'success');
+                })
+                .catch(error => {
+                    showMessage('加载测试数据失败: ' + error.message, 'error');
+                });
+        }
+
+        // 加载仅包含Phase2数据的测试数据
+        function loadPhase2OnlyData() {
+            const phase2OnlyData = {
+                "phase2_creation_and_delivery": {
+                    "videoProductionBlueprint": [
+                        {
+                            "sequence": 1,
+                            "clipSource": "video1.mp4",
+                            "clipSourceStartTime": "00:00",
+                            "clipSourceEndTime": "00:15",
+                            "clipDescription": "产品展示镜头",
+                            "englishVoiceoverScript": "Welcome to our amazing product showcase",
+                            "directorsNotes": "特写产品细节"
+                        },
+                        {
+                            "sequence": 2,
+                            "clipSource": "video2.mp4", 
+                            "clipSourceStartTime": "00:15",
+                            "clipSourceEndTime": "00:30",
+                            "clipDescription": "用户使用场景",
+                            "englishVoiceoverScript": "See how easy it is to use in daily life",
+                            "directorsNotes": "展示真实使用场景"
+                        }
+                    ],
+                    "cleanEnglishVoiceoverScript": "Welcome to our amazing product showcase. See how easy it is to use in daily life."
+                }
+            };
+            
+            document.getElementById('jsonInput').value = JSON.stringify(phase2OnlyData, null, 2);
+            showMessage('Phase2专用测试数据已加载', 'success');
+        }
+
+        function showMessage(msg, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = msg;
+            messageDiv.className = type;
+        }
+
+        // 从文本中提取有效的JSON对象（与前端代码一致）
+        function extractValidJSON(text) {
+            const jsonObjects = [];
+            let braceCount = 0;
+            let startIndex = -1;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                
+                if (char === '{') {
+                    if (braceCount === 0) {
+                        startIndex = i;
+                    }
+                    braceCount++;
+                } else if (char === '}') {
+                    braceCount--;
+                    if (braceCount === 0 && startIndex !== -1) {
+                        const jsonStr = text.substring(startIndex, i + 1);
+                        try {
+                            const parsed = JSON.parse(jsonStr);
+                            jsonObjects.push(parsed);
+                        } catch (e) {
+                            // 忽略无效的JSON
+                        }
+                        startIndex = -1;
+                    }
+                }
+            }
+            
+            // 检查JSON对象是否包含实际数据
+            function hasRealData(obj) {
+                const jsonStr = JSON.stringify(obj);
+                const placeholderCount = (jsonStr.match(/\.\.\./g) || []).length;
+                const totalLength = jsonStr.length;
+                return placeholderCount < 5 && totalLength > 1000;
+            }
+            
+            // 优先返回包含实际数据的两阶段JSON对象
+            for (const obj of jsonObjects) {
+                if ((obj.phase1_analysis_and_strategy && obj.phase2_creation_and_delivery) ||
+                    (obj.phase1 && obj.phase2)) {
+                    if (hasRealData(obj)) {
+                        return obj;
+                    }
+                }
+            }
+            
+            // 如果没有找到包含实际数据的两阶段对象，返回最大的包含实际数据的JSON对象
+            const realDataObjects = jsonObjects.filter(hasRealData);
+            if (realDataObjects.length > 0) {
+                return realDataObjects.reduce((largest, current) => {
+                    const currentSize = JSON.stringify(current).length;
+                    const largestSize = JSON.stringify(largest).length;
+                    return currentSize > largestSize ? current : largest;
+                });
+            }
+            
+            // 如果没有找到包含实际数据的对象，返回最大的JSON对象
+            if (jsonObjects.length > 0) {
+                return jsonObjects.reduce((largest, current) => {
+                    const currentSize = JSON.stringify(current).length;
+                    const largestSize = JSON.stringify(largest).length;
+                    return currentSize > largestSize ? current : largest;
+                });
+            }
+            
+            throw new Error('未找到有效的JSON对象');
+        }
+
+        // 渲染两阶段表格（与前端代码一致）
+        function renderTwoPhaseTable(data) {
+            let html = '<h3>两阶段视频制作蓝图</h3>';
+            
+            // Phase 1: 分析与策略
+            if (data.phase1) {
+                html += '<h4>Phase 1: 分析与策略</h4>';
+                
+                // 关键卖点
+                if (data.phase1.keySellingPoints && Array.isArray(data.phase1.keySellingPoints)) {
+                    html += '<h5>关键卖点</h5>';
+                    html += '<table><thead><tr><th>序号</th><th>卖点</th></tr></thead><tbody>';
+                    data.phase1.keySellingPoints.forEach((point, index) => {
+                        html += `<tr><td>${index + 1}</td><td>${point}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                }
+                
+                // 片段分析
+                if (data.phase1.clipAnalysis && Array.isArray(data.phase1.clipAnalysis)) {
+                    html += '<h5>片段分析</h5>';
+                    html += '<table><thead><tr><th>片段标识</th><th>是否长片段</th><th>分析</th><th>微片段</th></tr></thead><tbody>';
+                    data.phase1.clipAnalysis.forEach(clip => {
+                        let microClipsText = '无';
+                        if (clip.microClips && Array.isArray(clip.microClips)) {
+                            if (clip.microClips.length > 0) {
+                                // 如果微片段是对象数组，提取描述信息
+                                microClipsText = clip.microClips.map(microClip => {
+                                    if (typeof microClip === 'object' && microClip.timestamp && microClip.description) {
+                                        return `${microClip.timestamp}: ${microClip.description}`;
+                                    }
+                                    return microClip.toString();
+                                }).join('<br>');
+                            }
+                        }
+                        html += `<tr>
+                            <td>${clip.clipIdentifier || ''}</td>
+                            <td>${clip.isLongClip ? '是' : '否'}</td>
+                            <td>${clip.analysis || ''}</td>
+                            <td>${microClipsText}</td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                }
+                
+                // 配音节奏基准
+                if (data.phase1.voiceoverPaceBenchmark) {
+                    html += '<h5>配音节奏基准</h5>';
+                    html += '<table><thead><tr><th>指标</th><th>值</th></tr></thead><tbody>';
+                    html += `<tr><td>语速</td><td>${data.phase1.voiceoverPaceBenchmark.wpm || ''} ${data.phase1.voiceoverPaceBenchmark.unit || ''}</td></tr>`;
+                    html += '</tbody></table>';
+                }
+            }
+            
+            // Phase 2: 创作与交付
+            if (data.phase2 && data.phase2.videoProductionBlueprint && Array.isArray(data.phase2.videoProductionBlueprint)) {
+                html += '<h4>Phase 2: 创作与交付</h4>';
+                html += '<h5>视频制作蓝图</h5>';
+                html += '<table><thead><tr><th>序号</th><th>片段来源</th><th>片段描述</th><th>英文配音脚本</th><th>导演备注</th></tr></thead><tbody>';
+                
+                data.phase2.videoProductionBlueprint.forEach(item => {
+                    html += `<tr>
+                        <td>${item.sequence || ''}</td>
+                        <td>${item.clipSource || ''}</td>
+                        <td>${item.clipDescription || ''}</td>
+                        <td>${item.englishVoiceoverScript || ''}</td>
+                        <td>${item.directorsNotes || ''}</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table>';
+            }
+            
+            return html;
+        }
+
+        // 渲染表格主函数 - 优化版本，优先显示Phase2数据
+        function renderTable(data) {
+            try {
+                console.log('renderTable called with data:', data);
+                
+                // 优先检查Phase2数据（减少错误率）
+                let phase2Data = null;
+                
+                // 尝试多种可能的Phase2数据路径
+                if (data && data.phase2_creation_and_delivery) {
+                    phase2Data = data.phase2_creation_and_delivery;
+                    console.log('找到 phase2_creation_and_delivery 数据');
+                } else if (data && data.phase2) {
+                    phase2Data = data.phase2;
+                    console.log('找到 phase2 数据');
+                } else if (data && data.videoProductionBlueprint) {
+                    // 直接是视频制作蓝图数据
+                    phase2Data = { videoProductionBlueprint: data.videoProductionBlueprint };
+                    console.log('找到直接的 videoProductionBlueprint 数据');
+                }
+                
+                // 如果找到Phase2数据，优先渲染
+                if (phase2Data && phase2Data.videoProductionBlueprint && Array.isArray(phase2Data.videoProductionBlueprint) && phase2Data.videoProductionBlueprint.length > 0) {
+                    console.log(`渲染Phase2表格，包含 ${phase2Data.videoProductionBlueprint.length} 个视频片段`);
+                    return renderPhase2OnlyTable(phase2Data);
+                }
+                
+                // 如果没有找到Phase2数据，尝试完整的两阶段渲染
+                const hasNewTwoPhase = data && 
+                    ((data.phase1 && data.phase2) || 
+                     (data.phase1_analysis_and_strategy && data.phase2_creation_and_delivery));
+                
+                if (hasNewTwoPhase) {
+                    console.log('渲染完整的两阶段表格');
+                    // 标准化数据结构，统一转换为 phase1/phase2 格式
+                    const normalizedData = {
+                        phase1: data.phase1 || data.phase1_analysis_and_strategy,
+                        phase2: data.phase2 || data.phase2_creation_and_delivery
+                    };
+                    return renderTwoPhaseTable(normalizedData);
+                }
+                
+                // 最后尝试通用表格渲染
+                console.log('使用通用表格渲染');
+                return '<p>数据格式不支持，请检查JSON结构</p>';
+                
+            } catch (error) {
+                return `<p class="error">渲染表格时出错: ${error.message}</p>`;
+            }
+        }
+        
+        // 新增：专门渲染Phase2数据的函数
+        function renderPhase2OnlyTable(phase2Data) {
+            let html = '<div style="background-color: #f0f9ff; padding: 16px; border-radius: 8px;">';
+            html += '<h3 style="color: #1e40af; margin-bottom: 12px;">视频制作蓝图 (Phase 2)</h3>';
+            
+            const blueprint = phase2Data.videoProductionBlueprint;
+            
+            html += '<div style="overflow-x: auto;">';
+            html += '<table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px;">';
+            html += '<thead style="background-color: #f9fafb;">';
+            html += '<tr>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">序列编号</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">视频名称</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">起始时间</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">截止时间</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">画面描述</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">口播文案</th>';
+            html += '<th style="padding: 12px; border: 1px solid #d1d5db; text-align: left; font-weight: 600;">导演备注</th>';
+            html += '</tr>';
+            html += '</thead>';
+            html += '<tbody>';
+            
+            blueprint.forEach((item, index) => {
+                const rowStyle = index % 2 === 0 ? 'background-color: white;' : 'background-color: #f9fafb;';
+                html += `<tr style="${rowStyle}">`;
+                
+                // 序列编号
+                const sequenceNumber = item.sequence || (index + 1);
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${sequenceNumber}</td>`;
+                
+                // 视频名称 (从clipSource映射)
+                const videoName = item.clipSource || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${videoName}</td>`;
+                
+                // 起始时间
+                const startTime = item.clipSourceStartTime || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${startTime}</td>`;
+                
+                // 截止时间
+                const endTime = item.clipSourceEndTime || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${endTime}</td>`;
+                
+                // 画面描述
+                const sceneDescription = item.clipDescription || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${sceneDescription}</td>`;
+                
+                // 口播文案
+                const voiceover = item.englishVoiceoverScript || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${voiceover}</td>`;
+                
+                // 导演备注
+                const directorNotes = item.directorsNotes || '';
+                html += `<td style="padding: 12px; border: 1px solid #d1d5db;">${directorNotes}</td>`;
+                
+                html += '</tr>';
+            });
+            
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            
+            // 显示完整英文配音脚本（如果存在）
+            if (phase2Data.cleanEnglishVoiceoverScript) {
+                html += '<div style="margin-top: 16px;">';
+                html += '<h4 style="font-weight: 600; color: #374151; margin-bottom: 8px;">完整英文配音脚本</h4>';
+                html += '<div style="background: white; padding: 12px; border-radius: 4px; border: 1px solid #d1d5db;">';
+                html += `<p style="font-size: 14px; color: #6b7280; white-space: pre-wrap;">${phase2Data.cleanEnglishVoiceoverScript}</p>`;
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            console.log('Phase2专用表格渲染完成');
+            return html;
+        }
+
+        // 测试表格渲染
+        function renderTestTable() {
+            const jsonText = document.getElementById('jsonInput').value.trim();
+            if (!jsonText) {
+                showMessage('请先输入JSON数据', 'error');
+                return;
+            }
+            
+            try {
+                let jsonData;
+                
+                // 尝试直接解析
+                try {
+                    jsonData = JSON.parse(jsonText);
+                } catch (e) {
+                    // 如果直接解析失败，尝试提取有效JSON
+                    jsonData = extractValidJSON(jsonText);
+                }
+                
+                showMessage(`成功解析JSON数据，大小: ${JSON.stringify(jsonData).length} 字符`, 'success');
+                
+                // 渲染表格
+                const tableHtml = renderTable(jsonData);
+                document.getElementById('tableContainer').innerHTML = tableHtml;
+                
+            } catch (error) {
+                showMessage('解析JSON失败: ' + error.message, 'error');
+                document.getElementById('tableContainer').innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>

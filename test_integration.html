@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频策略集成测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎬 视频策略集成测试</h1>
+        <p>测试AI编辑器与视频策略页面的数据传递和集成功能</p>
+        
+        <div class="test-section">
+            <h3>测试步骤：</h3>
+            <button class="test-button" onclick="testDataValidation()">1. 测试数据验证</button>
+            <button class="test-button" onclick="testDataStorage()">2. 测试数据存储</button>
+            <button class="test-button" onclick="testPageJump()">3. 测试页面跳转</button>
+            <button class="test-button" onclick="testFullIntegration()">4. 完整集成测试</button>
+        </div>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // 测试数据
+        const testData = {
+            "phase1_analysis_and_strategy": {
+                "targetAudience": {
+                    "primaryAudience": "25-35岁都市女性",
+                    "demographics": "中高收入，注重护肤",
+                    "painPoints": ["肌肤暗沉", "缺乏光泽", "护肤效果不明显"],
+                    "desires": ["快速见效", "天然成分", "简单易用"]
+                },
+                "competitorAnalysis": {
+                    "directCompetitors": ["兰蔻", "雅诗兰黛", "SK-II"],
+                    "competitiveAdvantages": ["3分钟快速见效", "天然植物精华", "性价比高"],
+                    "marketGap": "快速见效的天然护肤产品"
+                },
+                "contentStrategy": {
+                    "coreMessage": "3分钟焕发自然光彩",
+                    "emotionalTriggers": ["自信", "美丽", "年轻"],
+                    "callToAction": "立即体验，重获光彩肌肤"
+                },
+                "sellingPoints": [
+                    "天然植物精华，温和不刺激",
+                    "3分钟快速见效，立竿见影",
+                    "深层滋养，持久保湿",
+                    "专业配方，安全可靠"
+                ]
+            },
+            "phase2_creation_and_delivery": {
+                "clipAnalysis": {
+                    "recommendedClips": [
+                        {
+                            "clipType": "问题展示",
+                            "duration": "3s",
+                            "description": "展示肌肤问题，引起共鸣",
+                            "visualElements": ["特写镜头", "对比效果"]
+                        },
+                        {
+                            "clipType": "产品介绍",
+                            "duration": "4s", 
+                            "description": "产品特写，突出天然成分",
+                            "visualElements": ["产品特写", "成分展示"]
+                        },
+                        {
+                            "clipType": "使用演示",
+                            "duration": "5s",
+                            "description": "使用过程，强调简单易用",
+                            "visualElements": ["手部动作", "涂抹过程"]
+                        },
+                        {
+                            "clipType": "效果展示",
+                            "duration": "3s",
+                            "description": "效果对比，突出改善效果",
+                            "visualElements": ["前后对比", "光泽效果"]
+                        }
+                    ],
+                    "totalDuration": "15s"
+                },
+                "videoProductionBlueprint": {
+                    "scenes": [
+                        {
+                            "sequenceNumber": 1,
+                            "timeRange": "0-3s",
+                            "sceneDescription": "问题引入",
+                            "cameraMovement": "特写推进",
+                            "lighting": "自然光",
+                            "props": ["镜子", "护肤品"],
+                            "transitions": "淡入"
+                        },
+                        {
+                            "sequenceNumber": 2,
+                            "timeRange": "3-7s", 
+                            "sceneDescription": "产品展示",
+                            "cameraMovement": "360度旋转",
+                            "lighting": "柔和补光",
+                            "props": ["产品包装", "天然元素"],
+                            "transitions": "切换"
+                        },
+                        {
+                            "sequenceNumber": 3,
+                            "timeRange": "7-12s",
+                            "sceneDescription": "使用演示",
+                            "cameraMovement": "跟随拍摄",
+                            "lighting": "温暖色调",
+                            "props": ["护肤品", "化妆镜"],
+                            "transitions": "流畅过渡"
+                        },
+                        {
+                            "sequenceNumber": 4,
+                            "timeRange": "12-15s",
+                            "sceneDescription": "效果展示与CTA",
+                            "cameraMovement": "稳定特写",
+                            "lighting": "高亮突出",
+                            "props": ["效果对比", "购买按钮"],
+                            "transitions": "淡出"
+                        }
+                    ],
+                    "totalDuration": "15s"
+                },
+                "voiceoverScript": {
+                    "scriptSegments": [
+                        {
+                            "timeRange": "0-3s",
+                            "text": "还在为肌肤问题烦恼吗？",
+                            "tone": "关切询问",
+                            "pace": "中等",
+                            "emphasis": ["肌肤问题"]
+                        },
+                        {
+                            "timeRange": "3-7s",
+                            "text": "全新天然护肤精华，3分钟焕发光彩",
+                            "tone": "充满希望",
+                            "pace": "稍快",
+                            "emphasis": ["天然", "3分钟", "光彩"]
+                        },
+                        {
+                            "timeRange": "7-12s",
+                            "text": "轻轻涂抹，深层滋养，肌肤瞬间水润透亮",
+                            "tone": "温柔说明",
+                            "pace": "中等",
+                            "emphasis": ["深层滋养", "水润透亮"]
+                        },
+                        {
+                            "timeRange": "12-15s",
+                            "text": "立即下单，重获自信美肌！",
+                            "tone": "激励号召",
+                            "pace": "稍快",
+                            "emphasis": ["立即下单", "自信美肌"]
+                        }
+                    ],
+                    "totalDuration": "15s"
+                }
+            },
+            "metadata": {
+                "projectName": "天然护肤精华广告",
+                "createdAt": new Date().toISOString(),
+                "lastModified": new Date().toISOString(),
+                "tags": ["护肤", "美妆", "电商", "短视频"],
+                "version": "1.0"
+            }
+        };
+
+        function showResult(message, type = 'result') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+
+        function testDataValidation() {
+            showResult('🔍 正在测试数据验证...', 'result');
+            
+            // 模拟 isVideoStrategyData 函数
+            const hasPhase1 = testData.phase1_analysis_and_strategy;
+            const hasPhase2 = testData.phase2_creation_and_delivery && 
+                             testData.phase2_creation_and_delivery.videoProductionBlueprint;
+            
+            if (hasPhase1 && hasPhase2) {
+                showResult('✅ 数据验证通过！数据结构符合视频策略要求。', 'success');
+            } else {
+                showResult('❌ 数据验证失败！缺少必要的数据结构。', 'error');
+            }
+        }
+
+        function testDataStorage() {
+            showResult('💾 正在测试数据存储...', 'result');
+            
+            // 模拟存储到 localStorage
+            try {
+                const strategyId = 'test_strategy_' + Date.now();
+                localStorage.setItem(`video_strategy_${strategyId}`, JSON.stringify(testData));
+                
+                // 验证存储
+                const stored = localStorage.getItem(`video_strategy_${strategyId}`);
+                if (stored) {
+                    showResult(`✅ 数据存储成功！策略ID: ${strategyId}`, 'success');
+                } else {
+                    showResult('❌ 数据存储失败！', 'error');
+                }
+            } catch (error) {
+                showResult(`❌ 存储过程出错：${error.message}`, 'error');
+            }
+        }
+
+        function testPageJump() {
+            showResult('🔗 正在测试页面跳转...', 'result');
+            
+            try {
+                const strategyId = 'test_strategy_' + Date.now();
+                localStorage.setItem(`video_strategy_${strategyId}`, JSON.stringify(testData));
+                
+                // 构建跳转URL
+                const targetUrl = `/video-strategy?id=${strategyId}`;
+                
+                showResult(`✅ 页面跳转准备完成！<br>
+                           目标URL: <a href="${targetUrl}" target="_blank">${targetUrl}</a><br>
+                           <button onclick="window.open('${targetUrl}', '_blank')" class="test-button">打开视频策略页面</button>`, 'success');
+            } catch (error) {
+                showResult(`❌ 页面跳转准备失败：${error.message}`, 'error');
+            }
+        }
+
+        function testFullIntegration() {
+            showResult('🚀 正在进行完整集成测试...', 'result');
+            
+            setTimeout(() => {
+                try {
+                    // 1. 数据验证
+                    const hasPhase1 = testData.phase1_analysis_and_strategy;
+                    const hasPhase2 = testData.phase2_creation_and_delivery && 
+                                     testData.phase2_creation_and_delivery.videoProductionBlueprint;
+                    
+                    if (!hasPhase1 || !hasPhase2) {
+                        throw new Error('数据验证失败');
+                    }
+                    
+                    // 2. 数据存储
+                    const strategyId = 'integration_test_' + Date.now();
+                    localStorage.setItem(`video_strategy_${strategyId}`, JSON.stringify(testData));
+                    
+                    // 3. 验证存储
+                    const stored = localStorage.getItem(`video_strategy_${strategyId}`);
+                    if (!stored) {
+                        throw new Error('数据存储验证失败');
+                    }
+                    
+                    // 4. 页面跳转
+                    const targetUrl = `/video-strategy?id=${strategyId}`;
+                    
+                    showResult(`🎉 完整集成测试成功！<br><br>
+                               ✅ 数据验证通过<br>
+                               ✅ 数据存储成功<br>
+                               ✅ 页面跳转准备完成<br><br>
+                               <button onclick="window.open('${targetUrl}', '_blank')" class="test-button">🎬 打开视频策略页面</button>`, 'success');
+                    
+                } catch (error) {
+                    showResult(`❌ 完整集成测试失败：${error.message}`, 'error');
+                }
+            }, 1000);
+        }
+
+        // 页面加载时显示欢迎信息
+        window.onload = function() {
+            showResult('👋 欢迎使用视频策略集成测试工具！请点击上方按钮开始测试。', 'result');
+        };
+    </script>
+</body>
+</html>
